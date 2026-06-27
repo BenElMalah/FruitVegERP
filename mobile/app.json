@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "FruitVeg Collector",
+    "slug": "fruitveg-collector",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#198754"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fruitveg.collector"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#198754"
+      },
+      "package": "com.fruitveg.collector"
+    },
+    "plugins": []
+  }
+}
