@@ -43,7 +43,6 @@ export default function CaissePage() {
     api.caisse.types().then(setTypes);
     api.clients.list().then(setClients);
     if (tab === 'movements') api.caisse.movements().then(setMovements);
-    if (tab === 'missing') api.caisse.missing().then(setMissing);
   };
 
   const filteredClients = useMemo(() =>
@@ -139,7 +138,6 @@ export default function CaissePage() {
       <ul className="nav nav-tabs mb-3">
         <li className="nav-item"><button className={`nav-link ${tab === 'movements' ? 'active' : ''}`} onClick={() => setTab('movements')}>{t('Movements')}</button></li>
         <li className="nav-item"><button className={`nav-link ${tab === 'types' ? 'active' : ''}`} onClick={() => setTab('types')}>{t('Caisse Types')}</button></li>
-        <li className="nav-item"><button className={`nav-link ${tab === 'missing' ? 'active' : ''}`} onClick={() => setTab('missing')}>{t('Missing')}</button></li>
       </ul>
 
       {tab === 'movements' && (
@@ -309,36 +307,6 @@ export default function CaissePage() {
             </div>
           </div>
         </>
-      )}
-
-      {tab === 'missing' && (
-        <div className="card">
-          <div className="card-body p-0">
-            <div className="table-responsive">
-            <table className="table mb-0">
-              <thead>
-                <tr>
-                  <th>{t('Client')}</th>
-                  <th>{t('Total Out')}</th>
-                  <th>{t('Total Returned')}</th>
-                  <th>{t('Outstanding')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {missing.map((m, i) => (
-                  <tr key={i}>
-                    <td>{m.client}</td>
-                    <td>{m.total_out}</td>
-                    <td>{m.total_returned}</td>
-                    <td className="text-danger fw-bold">{m.balance}</td>
-                  </tr>
-                ))}
-                {!missing.length && <tr><td colSpan={4} className="text-center text-muted py-4">{t('No missing caisses')}</td></tr>}
-              </tbody>
-            </table>
-            </div>
-          </div>
-        </div>
       )}
 
       {showCreate && (
