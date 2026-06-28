@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import Pagination from '../components/Pagination';
 import type { Invoice } from '../types';
 
@@ -8,6 +9,7 @@ const PAGE_SIZE = 100;
 
 export default function InvoicesPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState<string | null>(null);
@@ -271,7 +273,7 @@ export default function InvoicesPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4 className="mb-0"><i className="bi bi-receipt me-2" />{t('Invoices')}</h4>
-        <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Create Invoice')}</button>
+        {user?.role !== 'collector' && <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Create Invoice')}</button>}
       </div>
 
       <div className="card mb-3 border-0 shadow-sm">
@@ -375,9 +377,11 @@ export default function InvoicesPage() {
                       <button className="btn btn-outline-success" onClick={() => whatsappShare(inv)} title={t('Share via WhatsApp')}>
                         <i className="bi bi-whatsapp" />
                       </button>
-                      <button className="btn btn-outline-primary" onClick={() => openEditModal(inv)} title={t('Edit')}>
-                        <i className="bi bi-pencil" />
-                      </button>
+                      {user?.role !== 'collector' && (
+                        <button className="btn btn-outline-primary" onClick={() => openEditModal(inv)} title={t('Edit')}>
+                          <i className="bi bi-pencil" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
