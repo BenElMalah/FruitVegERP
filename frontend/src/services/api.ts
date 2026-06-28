@@ -76,7 +76,7 @@ export const api = {
     get: (id: string) => request<any>(`/invoices/${id}`),
     create: (data: any) =>
       request<any>('/invoices', { method: 'POST', body: JSON.stringify(data) }),
-    group: (data: { invoice_ids: string[]; payment_amount?: number; payment_method?: string; notes?: string }) =>
+    group: (data: { invoice_ids: string[]; payment_amount?: number; payment_method?: string; notes?: string; lcn_date?: string }) =>
       request<any>('/invoices/group', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) =>
       request<any>(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

@@ -11,6 +11,7 @@ const methodLabels: Record<string, string> = {
   cash: 'Cash',
   bank_transfer: 'Bank Transfer',
   check: 'Check',
+  lcn: 'LCN',
 };
 
 export default function PaymentsPage() {
@@ -20,7 +21,7 @@ export default function PaymentsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [form, setForm] = useState({ client_id: '', amount: 0, payment_method: 'cash' as const, notes: '' });
+  const [form, setForm] = useState<{ client_id: string; amount: number; payment_method: string; notes: string; lcn_date: string }>({ client_id: '', amount: 0, payment_method: 'cash', notes: '', lcn_date: '' });
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [clientSearch, setClientSearch] = useState('');
@@ -37,7 +38,7 @@ export default function PaymentsPage() {
   ]).catch(() => {});
 
   const openCreate = () => {
-    setForm({ client_id: '', amount: 0, payment_method: 'cash', notes: '' });
+    setForm({ client_id: '', amount: 0, payment_method: 'cash', notes: '', lcn_date: '' });
     setSelectedInvoiceIds([]);
     setClientSearch('');
     setError('');
@@ -55,6 +56,7 @@ export default function PaymentsPage() {
           amount: form.amount,
           payment_method: form.payment_method,
           notes: form.notes,
+          lcn_date: form.payment_method === 'lcn' ? form.lcn_date : undefined,
         });
       } else {
         await api.invoices.group({
@@ -62,6 +64,7 @@ export default function PaymentsPage() {
           payment_amount: form.amount,
           payment_method: form.payment_method,
           notes: form.notes,
+          lcn_date: form.payment_method === 'lcn' ? form.lcn_date : undefined,
         });
       }
       setShowCreate(false);
@@ -136,7 +139,7 @@ export default function PaymentsPage() {
                   <td>{p.clients?.name || '-'}</td>
                   <td className="text-success fw-bold">{Number(p.amount).toFixed(2)}</td>
                   <td><span className="badge bg-secondary">{t(methodLabels[p.payment_method] || p.payment_method.replace('_', ' '))}</span></td>
-                  <td><small>{new Date(p.created_at).toLocaleString()}</small></td>
+                  <td><small>{p.payment_method === 'lcn' && (p as any).lcn_date ? (p as any).lcn_date : new Date(p.created_at).toLocaleDateString()}</small></td>
                 </tr>
               ))}
               {!payments.length && <tr><td colSpan={5} className="text-center text-muted py-4">{t('No payments recorded')}</td></tr>}
@@ -245,8 +248,15 @@ export default function PaymentsPage() {
                     <option value="cash">{t('Cash')}</option>
                     <option value="bank_transfer">{t('Bank Transfer')}</option>
                     <option value="check">{t('Check')}</option>
+                    <option value="lcn">LCN</option>
                   </select>
                 </div>
+                {form.payment_method === 'lcn' && (
+                <div className="mb-3">
+                  <label className="form-label">{t('LCN Date')}</label>
+                  <input type="date" className="form-control" value={form.lcn_date} onChange={e => setForm({ ...form, lcn_date: e.target.value })} />
+                </div>
+                )}
                 <div className="mb-3">
                   <label className="form-label">{t('Notes')}</label>
                   <textarea className="form-control" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />

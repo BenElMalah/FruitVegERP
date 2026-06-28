@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 router.post('/group', authorize('boss', 'manager', 'collector'), async (req: AuthRequest, res: Response) => {
-  const { invoice_ids, payment_amount, payment_method, notes } = req.body;
+  const { invoice_ids, payment_amount, payment_method, notes, lcn_date } = req.body;
 
   if (!invoice_ids?.length) {
     return res.status(400).json({ error: 'invoice_ids are required' });
@@ -75,6 +75,7 @@ router.post('/group', authorize('boss', 'manager', 'collector'), async (req: Aut
         amount,
         payment_method: payment_method || 'cash',
         notes: notes || `Payment for grouped invoice`,
+        lcn_date: payment_method === 'lcn' ? lcn_date : null,
         received_by: req.user!.id,
       });
 

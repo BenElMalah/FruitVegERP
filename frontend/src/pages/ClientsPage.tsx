@@ -542,7 +542,7 @@ export default function ClientsPage() {
                               )}
                             </td>
                             <td>{(p.payment_method || '').replace('_', ' ')}</td>
-                            <td><small>{new Date(p.created_at).toLocaleDateString()}</small></td>
+                            <td><small>{(p as any).lcn_date || new Date(p.created_at).toLocaleDateString()}</small></td>
                             <td><small className="text-muted">{p.notes || '-'}</small></td>
                           </tr>
                         );

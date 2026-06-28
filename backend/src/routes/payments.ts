@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 router.post('/', async (req: AuthRequest, res: Response) => {
-  const { invoice_id, client_id, amount, payment_method, notes, proof_image_url, signature_url } = req.body;
+  const { invoice_id, client_id, amount, payment_method, notes, proof_image_url, signature_url, lcn_date } = req.body;
 
   if (!invoice_id || !client_id || !amount) {
     return res.status(400).json({ error: 'invoice_id, client_id, and amount are required' });
@@ -33,6 +33,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       notes,
       proof_image_url,
       signature_url,
+      lcn_date: payment_method === 'lcn' ? lcn_date : null,
       received_by: req.user!.id,
     })
     .select()

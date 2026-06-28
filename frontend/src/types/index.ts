@@ -66,7 +66,8 @@ export interface Payment {
   client_id: string;
   clients?: { name: string };
   amount: number;
-  payment_method: 'cash' | 'bank_transfer' | 'check';
+  payment_method: 'cash' | 'bank_transfer' | 'check' | 'lcn';
+  lcn_date?: string;
   notes?: string;
   proof_image_url?: string;
   signature_url?: string;
