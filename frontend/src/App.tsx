@@ -15,6 +15,7 @@ import TrucksPage from './pages/TrucksPage';
 import StockPage from './pages/StockPage';
 import AlertsPage from './pages/AlertsPage';
 import WholesaleInvoiceTracker from './pages/WholesaleInvoiceTracker';
+import CrateMovementTracker from './pages/CrateMovementTracker';
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="trucks" element={<ProtectedRoute roles={['boss', 'manager']}><TrucksPage /></ProtectedRoute>} />
               <Route path="stock" element={<ProtectedRoute roles={['boss', 'manager', 'warehouse']}><StockPage /></ProtectedRoute>} />
               <Route path="invoice-tracker" element={<WholesaleInvoiceTracker />} />
+              <Route path="crate-tracker" element={<CrateMovementTracker />} />
             </Route>
           </Route>
         </Routes>
