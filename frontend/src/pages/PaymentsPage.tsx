@@ -26,6 +26,10 @@ export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [searchClient, setSearchClient] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showDateFilter, setShowDateFilter] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -81,9 +85,46 @@ export default function PaymentsPage() {
     return list;
   }, [invoices, form.client_id]);
   const pagedPayments = useMemo(() => {
+    let result = payments;
+
+    if (searchClient.trim()) {
+      const q = searchClient.toLowerCase();
+      result = result.filter(p => (p.clients?.name || '').toLowerCase().includes(q));
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    if (!dateFrom && !dateTo) {
+      result = result.filter(p => {
+        const d = new Date(p.created_at).toISOString().split('T')[0];
+        return d === today;
+      });
+    } else {
+      if (dateFrom) result = result.filter(p => p.created_at && p.created_at >= dateFrom);
+      if (dateTo) result = result.filter(p => p.created_at && p.created_at <= dateTo + 'T23:59:59');
+    }
+
     const start = (page - 1) * PAGE_SIZE;
-    return payments.slice(start, start + PAGE_SIZE);
-  }, [payments, page]);
+    return result.slice(start, start + PAGE_SIZE);
+  }, [payments, searchClient, dateFrom, dateTo, page]);
+
+  const filteredCount = useMemo(() => {
+    let result = payments;
+    if (searchClient.trim()) {
+      const q = searchClient.toLowerCase();
+      result = result.filter(p => (p.clients?.name || '').toLowerCase().includes(q));
+    }
+    const today = new Date().toISOString().split('T')[0];
+    if (!dateFrom && !dateTo) {
+      result = result.filter(p => {
+        const d = new Date(p.created_at).toISOString().split('T')[0];
+        return d === today;
+      });
+    } else {
+      if (dateFrom) result = result.filter(p => p.created_at && p.created_at >= dateFrom);
+      if (dateTo) result = result.filter(p => p.created_at && p.created_at <= dateTo + 'T23:59:59');
+    }
+    return result.length;
+  }, [payments, searchClient, dateFrom, dateTo]);
 
   const filteredClients = useMemo(() =>
     clientSearch ? clients.filter((c: any) => c.name.toLowerCase().includes(clientSearch.toLowerCase())) : clients
@@ -119,6 +160,49 @@ export default function PaymentsPage() {
         {canCreate && <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Register Payment')}</button>}
       </div>
 
+      <div className="card mb-3 border-0 shadow-sm">
+        <div className="card-body py-3">
+          <div className="d-flex gap-2 align-items-center flex-wrap">
+            <div className="input-group" style={{ maxWidth: 300 }}>
+              <span className="input-group-text bg-light"><i className="bi bi-search" /></span>
+              <input type="text" className="form-control" placeholder={t('Search client...')}
+                value={searchClient}
+                onChange={e => { setSearchClient(e.target.value); setPage(1); }}
+              />
+            </div>
+            <button className={`btn ${showDateFilter ? 'btn-secondary' : 'btn-outline-secondary'}`}
+              onClick={() => setShowDateFilter(!showDateFilter)}>
+              <i className="bi bi-calendar me-1" />{t('Date Filter')}
+              {(dateFrom || dateTo) && <span className="badge bg-danger ms-1">!</span>}
+            </button>
+            {(dateFrom || dateTo) && (
+              <button className="btn btn-outline-danger btn-sm" onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }}>
+                <i className="bi bi-x-circle me-1" />{t('Clear')}
+              </button>
+            )}
+            <span className="text-muted ms-auto small">
+              {filteredCount} {t('payments')}
+            </span>
+          </div>
+          {showDateFilter && (
+            <div className="border-top pt-3 mt-3">
+              <div className="d-flex gap-2 align-items-end flex-wrap">
+                <div style={{ minWidth: 150 }}>
+                  <label className="form-label small text-muted mb-1">{t('From')}</label>
+                  <input type="date" className="form-control form-control-sm" value={dateFrom}
+                    onChange={e => { setDateFrom(e.target.value); setPage(1); }} />
+                </div>
+                <div style={{ minWidth: 150 }}>
+                  <label className="form-label small text-muted mb-1">{t('To')}</label>
+                  <input type="date" className="form-control form-control-sm" value={dateTo}
+                    onChange={e => { setDateTo(e.target.value); setPage(1); }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="card">
         <div className="card-body p-0">
           <div className="table-responsive">
@@ -144,11 +228,11 @@ export default function PaymentsPage() {
                   <td><small>{(p as any).profiles?.name || '-'}</small></td>
                 </tr>
               ))}
-              {!payments.length && <tr><td colSpan={6} className="text-center text-muted py-4">{t('No payments recorded')}</td></tr>}
+              {!pagedPayments.length && <tr><td colSpan={6} className="text-center text-muted py-4">{t('No payments recorded')}</td></tr>}
             </tbody>
           </table>
           </div>
-          <Pagination total={payments.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination total={filteredCount} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </div>
       </div>
 
