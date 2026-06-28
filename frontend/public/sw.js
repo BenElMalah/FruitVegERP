@@ -23,6 +23,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
+  if (!request.url.startsWith('http://') && !request.url.startsWith('https://')) return;
 
   if (request.url.includes('/api/') || request.url.includes('supabase')) {
     event.respondWith(
