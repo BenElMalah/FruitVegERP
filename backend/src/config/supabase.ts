@@ -16,11 +16,5 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
   process.exit(1);
 }
 
-let realtimeOptions: any = {};
-try {
-  const ws = require('ws');
-  realtimeOptions = { transport: ws };
-} catch {}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, realtimeOptions);
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, realtimeOptions);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
