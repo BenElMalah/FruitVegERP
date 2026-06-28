@@ -146,13 +146,15 @@ export default function CaissePage() {
             <div className="card-body py-3">
               <div className="d-flex gap-2 align-items-center flex-wrap">
                 <div className="position-relative" style={{ maxWidth: 300 }}>
-                  <span className="input-group-text bg-light" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 2, border: '1px solid #dee2e6', borderRadius: '0.375rem 0 0 0.375rem', display: 'flex', alignItems: 'center' }}><i className="bi bi-search" /></span>
-                  <input type="text" className="form-control" style={{ paddingLeft: 36 }} placeholder={t('Search client...')}
-                    value={searchClient}
-                    onChange={e => { setSearchClient(e.target.value); setPage(1); }}
-                    onFocus={() => setShowClientDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                  />
+                  <div className="input-group">
+                    <span className="input-group-text bg-light"><i className="bi bi-search" /></span>
+                    <input type="text" className="form-control" placeholder={t('Search client...')}
+                      value={searchClient}
+                      onChange={e => { setSearchClient(e.target.value); setPage(1); }}
+                      onFocus={() => setShowClientDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
+                    />
+                  </div>
                   {showClientDropdown && searchClient && (
                     <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 180, overflow: 'auto' }}>
                       {filteredClients.map((c: any) => (
