@@ -119,7 +119,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="row g-3">
-          <div className="col-md-4">
+          <div className="col-md-3">
             <Link to="/clients" className="card text-decoration-none text-dark h-100">
               <div className="card-body text-center py-5">
                 <i className="bi bi-people display-3 text-primary" />
@@ -128,7 +128,7 @@ export default function DashboardPage() {
               </div>
             </Link>
           </div>
-          <div className="col-md-4">
+          <div className="col-md-3">
             <Link to="/invoices" className="card text-decoration-none text-dark h-100">
               <div className="card-body text-center py-5">
                 <i className="bi bi-receipt display-3 text-info" />
@@ -137,12 +137,21 @@ export default function DashboardPage() {
               </div>
             </Link>
           </div>
-          <div className="col-md-4">
+          <div className="col-md-3">
             <Link to="/payments" className="card text-decoration-none text-dark h-100">
               <div className="card-body text-center py-5">
                 <i className="bi bi-cash-coin display-3 text-success" />
                 <h5 className="mt-3">{t('Collect Payments')}</h5>
                 <p className="text-muted small">{t('Record payments from clients')}</p>
+              </div>
+            </Link>
+          </div>
+          <div className="col-md-3">
+            <Link to="/caisse" className="card text-decoration-none text-dark h-100">
+              <div className="card-body text-center py-5">
+                <i className="bi bi-arrow-return-left display-3 text-warning" />
+                <h5 className="mt-3">{t('Return Caisses')}</h5>
+                <p className="text-muted small">{t('Record caisse returns from clients')}</p>
               </div>
             </Link>
           </div>
