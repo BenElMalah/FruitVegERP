@@ -130,6 +130,7 @@ export default function PaymentsPage() {
                 <th>{t('Amount')}</th>
                 <th>{t('Method')}</th>
                 <th>{t('Date')}</th>
+                <th>{t('Collected By')}</th>
               </tr>
             </thead>
             <tbody>
@@ -140,9 +141,10 @@ export default function PaymentsPage() {
                   <td className="text-success fw-bold">{Number(p.amount).toFixed(2)}</td>
                   <td><span className="badge bg-secondary">{t(methodLabels[p.payment_method] || p.payment_method.replace('_', ' '))}</span></td>
                   <td><small>{p.payment_method === 'lcn' && (p as any).lcn_date ? (p as any).lcn_date : new Date(p.created_at).toLocaleDateString()}</small></td>
+                  <td><small>{(p as any).profiles?.name || '-'}</small></td>
                 </tr>
               ))}
-              {!payments.length && <tr><td colSpan={5} className="text-center text-muted py-4">{t('No payments recorded')}</td></tr>}
+              {!payments.length && <tr><td colSpan={6} className="text-center text-muted py-4">{t('No payments recorded')}</td></tr>}
             </tbody>
           </table>
           </div>

@@ -9,7 +9,7 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res: Response) => {
   const { data, error } = await supabaseAdmin
     .from('payments')
-    .select('*, invoices(invoice_number), clients(name)')
+    .select('*, invoices(invoice_number), clients(name), profiles:received_by(name)')
     .order('created_at', { ascending: false });
 
   if (error) return res.status(400).json({ error: error.message });
@@ -58,7 +58,7 @@ router.get('/today', async (req: AuthRequest, res: Response) => {
 
   const { data, error } = await supabaseAdmin
     .from('payments')
-    .select('*, clients(name), invoices(invoice_number)')
+    .select('*, clients(name), invoices(invoice_number), profiles:received_by(name)')
     .gte('created_at', today.toISOString())
     .order('created_at', { ascending: false });
 
@@ -69,7 +69,7 @@ router.get('/today', async (req: AuthRequest, res: Response) => {
 router.get('/client/:clientId', async (req: AuthRequest, res: Response) => {
   const { data, error } = await supabaseAdmin
     .from('payments')
-    .select('*, invoices(invoice_number)')
+    .select('*, invoices(invoice_number), profiles:received_by(name)')
     .eq('client_id', req.params.clientId)
     .order('created_at', { ascending: false });
 
