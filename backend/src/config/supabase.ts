@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import ws from 'ws';
 
 dotenv.config();
 
@@ -17,7 +16,11 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const realtimeConfig = { transport: ws as any };
+let realtimeOptions: any = {};
+try {
+  const ws = require('ws');
+  realtimeOptions = { transport: ws };
+} catch {}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, { realtime: realtimeConfig });
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { realtime: realtimeConfig });
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, realtimeOptions);
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, realtimeOptions);
