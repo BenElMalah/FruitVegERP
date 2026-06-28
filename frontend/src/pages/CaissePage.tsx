@@ -148,8 +148,8 @@ export default function CaissePage() {
             <div className="card-body py-3">
               <div className="d-flex gap-2 align-items-center flex-wrap">
                 <div className="position-relative" style={{ maxWidth: 300 }}>
-                  <span className="input-group-text bg-light border-end-0 position-absolute" style={{ left: 0, top: 0, bottom: 0, zIndex: 2, border: '1px solid #dee2e6', borderRight: 'none', borderRadius: '0.375rem 0 0 0.375rem' }}><i className="bi bi-search" /></span>
-                  <input type="text" className="form-control border-start-0 ps-0" style={{ paddingLeft: 32 }} placeholder={t('Search client...')}
+                  <span className="input-group-text bg-light" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 2, border: '1px solid #dee2e6', borderRadius: '0.375rem 0 0 0.375rem', display: 'flex', alignItems: 'center' }}><i className="bi bi-search" /></span>
+                  <input type="text" className="form-control" style={{ paddingLeft: 36 }} placeholder={t('Search client...')}
                     value={searchClient}
                     onChange={e => { setSearchClient(e.target.value); setPage(1); }}
                     onFocus={() => setShowClientDropdown(true)}
