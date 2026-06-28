@@ -7,7 +7,7 @@ interface AuthContextType {
   user: Profile | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -64,8 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const res = await api.auth.login(email, password);
+  const login = async (username: string, password: string) => {
+    const res = await api.auth.login(username, password);
     updateToken(res.token);
     setUser(res.user);
     if (supabase) {

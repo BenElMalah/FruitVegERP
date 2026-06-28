@@ -6,29 +6,29 @@ import { authorize } from '../middleware/rbac';
 const router = Router();
 
 router.post('/login', async (req: AuthRequest, res: Response) => {
-  const { email, password } = req.body;
+  const { username, password } = req.body;
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email, password,
-  });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password are required' });
+  }
 
-  if (error) return res.status(401).json({ error: error.message });
-
-  let { data: profile } = await supabaseAdmin
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('*')
-    .eq('id', data.user.id)
+    .eq('username', username)
     .single();
 
-  if (!profile) {
-    const { data: np, error: ie } = await supabaseAdmin
-      .from('profiles')
-      .insert({ id: data.user.id, email, name: email.split('@')[0], role: 'boss' })
-      .select()
-      .single();
-    if (ie) return res.status(500).json({ error: 'Failed to create profile' });
-    profile = np;
+  if (profileError || !profile) {
+    return res.status(401).json({ error: 'Invalid username or password' });
   }
+
+  const loginEmail = profile.email;
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: loginEmail, password,
+  });
+
+  if (error) return res.status(401).json({ error: 'Invalid username or password' });
 
   res.json({
     token: data.session.access_token,
@@ -56,9 +56,21 @@ router.get('/users', authenticate, authorize('boss', 'manager'), async (req: Aut
 });
 
 router.post('/users', authenticate, authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
-  const { email, password, name, phone, role } = req.body;
-  if (!email || !password || !name || !role) {
-    return res.status(400).json({ error: 'email, password, name, and role required' });
+  const { username, password, name, phone, role } = req.body;
+  if (!username || !password || !name || !role) {
+    return res.status(400).json({ error: 'username, password, name, and role required' });
+  }
+
+  const email = `${username}@fruitveg.local`;
+
+  const { data: existingUser } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (existingUser) {
+    return res.status(409).json({ error: 'Username already exists' });
   }
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -69,7 +81,7 @@ router.post('/users', authenticate, authorize('boss', 'manager'), async (req: Au
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .insert({ id: authData.user.id, email, name, phone, role })
+    .insert({ id: authData.user.id, email, username, name, phone, role })
     .select()
     .single();
 
@@ -82,14 +94,18 @@ router.post('/users', authenticate, authorize('boss', 'manager'), async (req: Au
 });
 
 router.put('/users/:id', authenticate, authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
-  const { name, phone, role, status, password } = req.body;
+  const { name, phone, role, status, password, username } = req.body;
   if (password) {
     const { error: pwdErr } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, { password });
     if (pwdErr) return res.status(400).json({ error: pwdErr.message });
   }
+
+  const updateData: any = { name, phone, role, status, updated_at: new Date().toISOString() };
+  if (username) updateData.username = username;
+
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .update({ name, phone, role, status, updated_at: new Date().toISOString() })
+    .update(updateData)
     .eq('id', req.params.id)
     .select()
     .single();

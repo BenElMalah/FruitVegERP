@@ -12,7 +12,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', name: '', phone: '', role: 'collector' });
+  const [form, setForm] = useState({ username: '', password: '', name: '', phone: '', role: 'collector' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: '', phone: '', role: '', status: '', password: '' });
   const [error, setError] = useState('');
@@ -38,7 +38,7 @@ export default function UsersPage() {
     try {
       await api.auth.createUser(form);
       setShowForm(false);
-      setForm({ email: '', password: '', name: '', phone: '', role: 'collector' });
+      setForm({ username: '', password: '', name: '', phone: '', role: 'collector' });
       load();
     } catch (e: any) {
       setError(e.message);
@@ -97,8 +97,8 @@ export default function UsersPage() {
                     onChange={e => setForm({ ...form, name: e.target.value })} required />
                 </div>
                 <div className="col-md-3">
-                  <input type="email" className="form-control form-control-sm" placeholder={t('Email')} value={form.email}
-                    onChange={e => setForm({ ...form, email: e.target.value })} required />
+                  <input className="form-control form-control-sm" placeholder={t('Username')} value={form.username}
+                    onChange={e => setForm({ ...form, username: e.target.value })} required />
                 </div>
                 <div className="col-md-2">
                   <input className="form-control form-control-sm" type="password" placeholder={t('Password')} value={form.password}
@@ -131,7 +131,7 @@ export default function UsersPage() {
           <thead>
             <tr>
               <th>{t('Name')}</th>
-              <th>{t('Email')}</th>
+              <th>{t('Username')}</th>
               <th>{t('Phone')}</th>
               <th>{t('Role')}</th>
               <th>{t('Status')}</th>
@@ -143,7 +143,7 @@ export default function UsersPage() {
             {pagedUsers.map(u => editingId === u.id ? (
               <tr key={u.id}>
                 <td><input className="form-control form-control-sm" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} /></td>
-                <td>{u.email}</td>
+                <td>{u.username}</td>
                 <td><input className="form-control form-control-sm" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
                 <td>
                   <select className="form-select form-select-sm" value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
@@ -170,7 +170,7 @@ export default function UsersPage() {
             ) : (
               <tr key={u.id}>
                 <td>{u.name}</td>
-                <td>{u.email}</td>
+                <td>{u.username}</td>
                 <td>{u.phone || '-'}</td>
                 <td><span className="badge bg-secondary">{u.role}</span></td>
                 <td><span className={`badge ${u.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{u.status}</span></td>

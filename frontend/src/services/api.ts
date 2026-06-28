@@ -28,14 +28,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   auth: {
-    login: (email: string, password: string) =>
+    login: (username: string, password: string) =>
       request<{ token: string; refreshToken: string; user: any }>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       }),
     me: () => request<any>('/auth/me'),
     users: () => request<any[]>('/auth/users'),
-    createUser: (data: { email: string; password: string; name: string; phone?: string; role: string }) =>
+    createUser: (data: { username: string; password: string; name: string; phone?: string; role: string }) =>
       request<any>('/auth/users', { method: 'POST', body: JSON.stringify(data) }),
     updateUser: (id: string, data: any) =>
       request<any>(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

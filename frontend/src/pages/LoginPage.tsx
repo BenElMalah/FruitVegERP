@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
   const { t } = useTranslation();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login } = useAuth();
@@ -15,7 +15,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     try {
-      await login(email, password);
+      await login(username, password);
       navigate('/');
     } catch (err: any) {
       setError(err.message);
@@ -33,8 +33,8 @@ export default function LoginPage() {
           {error && <div className="alert alert-danger py-2">{error}</div>}
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="form-label">{t('Email')}</label>
-              <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} required />
+              <label className="form-label">{t('Username')}</label>
+              <input type="text" className="form-control" value={username} onChange={e => setUsername(e.target.value)} required />
             </div>
             <div className="mb-3">
               <label className="form-label">{t('Password')}</label>

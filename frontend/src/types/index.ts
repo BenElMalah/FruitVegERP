@@ -1,6 +1,7 @@
 export interface Profile {
   id: string;
   name: string;
+  username: string;
   email: string;
   phone?: string;
   role: 'boss' | 'manager' | 'collector' | 'warehouse';
