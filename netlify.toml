@@ -8,13 +8,13 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://YOUR-RAILWAY-APP.up.railway.app/api/:splat"
+  to = "https://fruitvegerp-production.up.railway.app/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/health"
-  to = "https://YOUR-RAILWAY-APP.up.railway.app/health"
+  to = "https://fruitvegerp-production.up.railway.app/health"
   status = 200
   force = true
 
