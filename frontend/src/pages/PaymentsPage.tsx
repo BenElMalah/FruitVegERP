@@ -183,7 +183,7 @@ export default function PaymentsPage() {
                   setPage(1);
                 }
               }} title={t('Next day')} disabled={selectedDate >= new Date().toISOString().split('T')[0]}>
-                <i className="bi bi-chevron-left" />
+                <i className="bi bi-chevron-right" />
               </button>
               <div className="position-relative ms-1">
                 <button className="btn btn-sm btn-outline-secondary border-0 p-1" onClick={() => { setShowCalendar(!showCalendar); setShowRangePicker(false); }} title={t('Pick date')}>
