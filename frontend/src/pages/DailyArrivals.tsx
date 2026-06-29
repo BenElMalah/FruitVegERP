@@ -96,8 +96,7 @@ export default function DailyArrivals() {
   const [expenses, setExpenses] = useState<{ id: string; label: string; amount: number }[]>([]);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [showClientDropdown, setShowClientDropdown] = useState<string | null>(null);
-  const [showDeliverConfirm, setShowDeliverConfirm] = useState(false);
-  const [pendingDelivery, setPendingDelivery] = useState<{ entry: SavedEntry; NW: number; due: number } | null>(null);
+
 
   const rowRefs = useRef<Record<string, (HTMLInputElement | HTMLSelectElement | null)[]>>({});
 
@@ -179,11 +178,8 @@ export default function DailyArrivals() {
   const activeRows = rows[activeTruckId] || [];
   const activeTruck = trucks.find(t => t.id === activeTruckId);
   const activeRowsActive = activeRows.filter(r => r.status !== 'cancelled');
-  const allocated = activeRowsActive.reduce((s, r) => s + (r.weight || 0), 0);
-  const truckCapacity = activeTruck ? Number(activeTruck.net_weight) : 0;
   const truckProductName = activeTruck?.products?.name || '';
   const truckTotalCaisses = activeRowsActive.reduce((s, r) => s + totalCaisses(r.caisseItems), 0);
-  const truckCostPrice = Number(activeTruck?.cost_price) || 0;
 
   const showToastMsg = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type });
@@ -315,22 +311,6 @@ export default function DailyArrivals() {
   };
 
   const updateSavedEntry = async (entryId: string, patch: Partial<SavedEntry>) => {
-    if (patch.status !== undefined && patch.status === 'delivred') {
-      const entry = savedForTruck.find(e => e.id === entryId);
-      if (entry) {
-        const w = Number(entry.weight) || 0;
-        const p = Number(entry.price) || 0;
-        if (w <= 0 || p <= 0) {
-          showToastMsg('Cannot deliver: weight and price must be greater than 0', 'error');
-          return;
-        }
-        const nw = netWeight(entry.weight, entry.caisseItems || []);
-        const due = nw * (entry.price || 0);
-        setPendingDelivery({ entry, NW: nw, due });
-        setShowDeliverConfirm(true);
-        return;
-      }
-    }
     setSavedByDate(prev => {
       const updated = (prev[selectedDate] || []).map(e => e.id === entryId ? { ...e, ...patch } : e);
       return { ...prev, [selectedDate]: updated };
@@ -353,27 +333,6 @@ export default function DailyArrivals() {
     }
   };
 
-  const confirmDeliver = async () => {
-    if (!pendingDelivery) return;
-    const { entry } = pendingDelivery;
-    setShowDeliverConfirm(false);
-    setPendingDelivery(null);
-    setSavedByDate(prev => {
-      const updated = (prev[selectedDate] || []).map(e => e.id === entry.id ? { ...e, status: 'delivred' as EntryStatus } : e);
-      return { ...prev, [selectedDate]: updated };
-    });
-    setRows(prev => {
-      const truckRows = prev[activeTruckId] || [];
-      return { ...prev, [activeTruckId]: truckRows.map(r => r.id === entry.id ? { ...r, status: 'delivred' as EntryStatus } : r) };
-    });
-    try {
-      await api.arrivals.update(entry.id, { status: 'delivred' });
-      showToastMsg(`Invoice created for ${entry.clientName} — delivery completed!`, 'success');
-    } catch (err: any) {
-      showToastMsg(err.message || 'Failed to deliver', 'error');
-    }
-  };
-
   const finalizeTruck = async () => {
     setFinalizing(true);
     await new Promise(r => setTimeout(r, 800));
@@ -381,17 +340,10 @@ export default function DailyArrivals() {
     showToastMsg(`Truck "${activeTruck?.supplier_name}" dispatched — ${savedForTruck.length} entries`, 'success');
   };
 
-  const allocatedPct = truckCapacity > 0 ? (allocated / truckCapacity) * 100 : 0;
-
   const savedEntries = savedByDate[selectedDate] || [];
   const savedForTruck = savedEntries.filter(e => e.truckId === activeTruckId);
   const statusSummary = STATUSES.map(s => ({ status: s, count: savedForTruck.filter(e => e.status === s).length }));
   const totalSaved = savedForTruck.length;
-  const nonCancelledCount = savedForTruck.filter(e => e.status !== 'cancelled').length;
-  const totalNetWeight = savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + netWeight(e.weight, e.caisseItems || []), 0);
-  const totalDue = savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + dueAmount(e.weight, e.caisseItems || [], e.price), 0);
-  const supplierDue = totalNetWeight * truckCostPrice;
-  const profit = totalDue - supplierDue;
 
   if (loadingTrucks) {
     return (
@@ -425,55 +377,6 @@ export default function DailyArrivals() {
             <div className="flex items-center gap-2">
               <span>{toast.type === 'success' ? '✓' : '✕'}</span>
               <span>{toast.message}</span>
-            </div>
-          </div>
-        )}
-
-        {showDeliverConfirm && pendingDelivery && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-              <div className="px-6 py-4 bg-emerald-500 text-white">
-                <h3 className="text-lg font-bold">Confirm Delivery</h3>
-                <p className="text-sm text-emerald-100">This will create an invoice and send alerts to collectors.</p>
-              </div>
-              <div className="px-6 py-5">
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Client</span>
-                    <span className="font-semibold text-slate-800">{pendingDelivery.entry.clientName}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Product</span>
-                    <span className="font-semibold text-slate-800">{pendingDelivery.entry.product}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Weight</span>
-                    <span className="font-semibold text-slate-800">{pendingDelivery.entry.weight} kg</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Net Weight</span>
-                    <span className="font-semibold text-slate-800">{pendingDelivery.NW.toFixed(1)} kg</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Price</span>
-                    <span className="font-semibold text-slate-800">{pendingDelivery.entry.price} /kg</span>
-                  </div>
-                  <div className="border-t pt-3 flex justify-between">
-                    <span className="text-sm font-bold text-slate-700">Invoice Total</span>
-                    <span className="text-lg font-bold text-indigo-700">{pendingDelivery.due.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3">
-                <button onClick={() => { setShowDeliverConfirm(false); setPendingDelivery(null); }}
-                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-all">
-                  Cancel
-                </button>
-                <button onClick={confirmDeliver}
-                  className="px-5 py-2 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg transition-all active:scale-[0.98]">
-                  Confirm &amp; Deliver
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -567,18 +470,6 @@ export default function DailyArrivals() {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-slate-400">{truckTotalCaisses} caisses</span>
-              <div className="flex items-center gap-2.5">
-                <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-500 ${
-                    allocatedPct > 100 ? 'bg-red-400' : allocatedPct === 100 ? 'bg-emerald-400' : 'bg-indigo-400'
-                  }`} style={{ width: `${Math.min(allocatedPct, 100)}%` }} />
-                </div>
-                <span className={`text-[11px] font-bold ${
-                  allocatedPct > 100 ? 'text-red-600' : allocatedPct === 100 ? 'text-emerald-600' : 'text-slate-500'
-                }`}>
-                  {allocated}{truckCapacity > 0 ? `/${truckCapacity}` : ''} kg
-                </span>
-              </div>
             </div>
           </div>
 
@@ -718,8 +609,6 @@ onKeyDown={e => handleKeyDown(e, row.id)}
               <span className="text-slate-400">Saved: <strong className="text-emerald-600">{savedForTruck.length}</strong></span>
               <span className="text-slate-200">|</span>
               <span className="text-slate-400">Caisses: <strong className="text-slate-600">{truckTotalCaisses}</strong></span>
-              <span className="text-slate-200">|</span>
-              <span className="text-slate-400">kg: <strong className="text-slate-600">{allocated.toFixed(1)}</strong></span>
             </div>
           </div>
         </div>
@@ -756,11 +645,7 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                       <tr className="bg-slate-50/50">
                         <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Client</th>
                         <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Product</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px] w-[80px]">Price</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px] w-[60px]">Weight</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px] w-[60px]">Net Wt</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px] w-[80px]">Due</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Caisse</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Caisse Types</th>
                   <th className="text-left px-3 py-2.5 font-semibold text-slate-400 uppercase tracking-wider text-[10px] w-[110px]">Status</th>
                         <th className="w-6"></th>
                       </tr>
@@ -769,36 +654,15 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                       {savedForTruck.map((entry, i) => {
                         const st = STATUS_STYLES[entry.status];
                         const isEditable = isToday(selectedDate);
+                        const consolidatedCaisses = (entry.caisseItems || []).reduce((acc: Record<string, { type: string; qty: number }>, ci: CaisseItem) => {
+                          const key = ci.type || ci.caisseTypeId || `unknown_${ci.id}`;
+                          if (acc[key]) { acc[key].qty += ci.qty || 0; } else { acc[key] = { type: ci.type, qty: ci.qty || 0 }; }
+                          return acc;
+                        }, {} as Record<string, { type: string; qty: number }>);
                         return (
                           <tr key={`${entry.truckId}-${entry.id}`} className={`transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} hover:bg-indigo-50/40`}>
                             <td className="px-3 py-2.5 text-slate-700 font-medium">{entry.clientName}</td>
                             <td className="px-3 py-2.5 text-slate-600">{entry.product}</td>
-                            <td className="px-3 py-2.5">
-                              {isEditable ? (
-                                <input type="number" step="0.5" min="0" value={entry.price || ''}
-                                  onChange={e => updateSavedEntry(entry.id, { price: e.target.value === '' ? 0 : Number(e.target.value) })}
-                                  className="w-20 px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-300 text-right"
-                                  placeholder="0.00" />
-                              ) : (
-                                <span className="text-slate-600">{entry.price.toFixed(2)}</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              {isEditable ? (
-                                <input type="number" step="0.5" min="0" value={entry.weight || ''}
-                                  onChange={e => updateSavedEntry(entry.id, { weight: e.target.value === '' ? 0 : Number(e.target.value) })}
-                                  className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-300 text-right"
-                                  placeholder="kg" />
-                              ) : (
-                                <span className="text-slate-600">{entry.weight.toFixed(1)}</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 text-slate-700 font-medium">
-                              {netWeight(entry.weight, entry.caisseItems || []).toFixed(1)}
-                            </td>
-                            <td className="px-3 py-2.5 text-slate-800 font-bold">
-                              {dueAmount(entry.weight, entry.caisseItems || [], entry.price).toFixed(2)}
-                            </td>
                             <td className="px-3 py-2.5">
                               {isEditable && entry.caisseItems ? (
                                 <div className="flex flex-col gap-0.5">
@@ -822,8 +686,13 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                                           upd[ciIdx] = { ...upd[ciIdx], qty: e.target.value === '' ? 1 : Number(e.target.value) };
                                           updateSavedEntry(entry.id, { caisseItems: upd });
                                         }}
-                                        className="w-8 px-1 py-0.5 border border-slate-200 rounded text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-300 text-center"
+                                        className="w-12 px-1 py-0.5 border border-slate-200 rounded text-[10px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-300 text-center"
                                         placeholder="qty" />
+                                      <button onClick={() => {
+                                        const upd = entry.caisseItems.filter((_: any, idx: number) => idx !== ciIdx);
+                                        updateSavedEntry(entry.id, { caisseItems: upd });
+                                      }}
+                                        className="text-red-400 hover:text-red-600 text-[10px] font-bold px-0.5" title="Remove caisse type">✕</button>
                                     </div>
                                   ))}
                                   <button onClick={() => {
@@ -835,7 +704,9 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                                 </div>
                               ) : (
                                 <span className="text-slate-600 text-[10px]">
-                                  {entry.caisseItems?.length ? entry.caisseItems.map((ci: CaisseItem) => `${ci.qty}× ${ci.type}`).join(', ') : `${totalCaisses(entry.caisseItems || [])} caisses`}
+                                  {Object.keys(consolidatedCaisses).length > 0
+                                    ? Object.entries(consolidatedCaisses).map(([_, v]) => `${v.qty}× ${v.type}`).join(', ')
+                                    : `${totalCaisses(entry.caisseItems || [])} caisses`}
                                 </span>
                               )}
                             </td>
@@ -877,7 +748,7 @@ onKeyDown={e => handleKeyDown(e, row.id)}
           )}
 
               <div className="px-4 py-3 bg-slate-50/30">
-                <div className="flex flex-wrap items-center gap-5">
+                <div className="flex flex-wrap items-center gap-6">
                   {statusSummary.map(({ status, count }) => {
                     const st = STATUS_STYLES[status];
                     return (
@@ -890,77 +761,18 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                   })}
                   <div className="w-px h-4 bg-slate-200" />
                   <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
                     <span className="text-[11px] text-slate-500">Caisses</span>
-                    <span className="text-[11px] font-bold text-slate-800">
+                    <span className="text-sm font-bold text-slate-800">
                       {savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + totalCaisses(e.caisseItems || []), 0)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                    </svg>
-                    <span className="text-[11px] text-slate-500">Gross kg</span>
-                    <span className="text-[11px] font-bold text-slate-800">
-                      {savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + (e.weight || 0), 0).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span className="text-[11px] text-slate-500">Net kg</span>
-                    <span className="text-[11px] font-bold text-slate-800">
-                      {savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + netWeight(e.weight, e.caisseItems || []), 0).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-[11px] text-slate-500">Due</span>
+                    <span className="text-[11px] text-slate-500">Total Due</span>
                     <span className="text-sm font-bold text-indigo-700">
                       {savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + dueAmount(e.weight, e.caisseItems || [], e.price), 0).toFixed(2)}
                     </span>
-        </div>
-      </div>
-
-                {nonCancelledCount > 0 && (
-                  <div className="mt-2.5 h-2 bg-slate-100 rounded-full overflow-hidden flex">
-                    {statusSummary.filter(s => s.status !== 'cancelled').map(({ status, count }) => {
-                      if (count === 0) return null;
-                      const pct = (count / nonCancelledCount) * 100;
-                      const barColor = status === 'en demand' ? 'bg-amber-400' : 'bg-emerald-400';
-                      return <div key={status} className={`${barColor} h-full transition-all duration-500`} style={{ width: `${pct}%` }} title={`${STATUS_STYLES[status].label}: ${count} (${pct.toFixed(0)}%)`} />;
-                    })}
                   </div>
-                )}
-                {truckCapacity > 0 && (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] text-slate-400 font-medium">Truck weight</span>
-                      <span className="text-[10px] text-slate-500">{allocated.toFixed(1)} / {truckCapacity} kg</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-500 ${allocatedPct > 100 ? 'bg-red-400' : 'bg-indigo-400'}`}
-                        style={{ width: `${Math.min(allocatedPct, 100)}%` }} />
-                    </div>
-                  </div>
-                )}
-                {truckCostPrice > 0 && (
-                  <div className="mt-2.5 pt-2.5 flex flex-wrap items-center gap-5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-slate-500">Supplier due</span>
-                      <span className="text-[11px] font-bold text-slate-800">{supplierDue.toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-slate-500">Profit</span>
-                      <span className={`text-[11px] font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{profit.toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
               {isToday(selectedDate) && savedForTruck.length > 0 && (
                 <div className="px-4 py-3 flex justify-end">
@@ -1102,7 +914,7 @@ onKeyDown={e => handleKeyDown(e, row.id)}
             </div>
             <div className="px-6 py-4 border-t border-slate-100 absolute bottom-0 left-0 right-0 bg-white">
               <button onClick={saveQuickAdd} disabled={!drawerName.trim()}
-                className="w-full py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold text-sm rounded-xl hover:shadow-lg hover:shadow-indigo-200 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed transition-all shadow-md">
+                className="w-full py-2.5 bg-indigo-600 text-white font-semibold text-sm rounded-xl hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-all shadow-md active:scale-[0.98]">
                 Save Client
               </button>
             </div>

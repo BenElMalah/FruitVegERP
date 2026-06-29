@@ -120,7 +120,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 router.post('/', authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
-  const { client_id, items, due_date, notes } = req.body;
+  const { client_id, items, due_date, notes, notify_collectors } = req.body;
 
   if (!client_id || !items?.length) {
     return res.status(400).json({ error: 'Client ID and items are required' });
@@ -226,6 +226,35 @@ router.post('/', authorize('boss', 'manager'), async (req: AuthRequest, res: Res
     reference_type: 'invoice',
     reference_id: invoice.id,
   });
+
+  // Send notification to collectors if requested
+  if (notify_collectors) {
+    const { data: collectors } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('role', 'collector')
+      .eq('status', 'active');
+
+    if (collectors && collectors.length > 0) {
+      const { data: clientData } = await supabaseAdmin
+        .from('clients')
+        .select('name')
+        .eq('id', client_id)
+        .single();
+
+      const notifications = collectors.map((c: any) => ({
+        user_id: c.id,
+        title: 'New Invoice',
+        message: `New invoice #${invoice.invoice_number} for client "${clientData?.name || 'Unknown'}" — Total: ${total.toFixed(2)}`,
+        type: 'invoice',
+        reference_type: 'invoice',
+        reference_id: invoice.id,
+        read_status: false,
+      }));
+
+      await supabaseAdmin.from('notifications').insert(notifications);
+    }
+  }
 
   res.status(201).json(invoice);
 });

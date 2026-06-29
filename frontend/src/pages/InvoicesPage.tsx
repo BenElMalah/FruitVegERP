@@ -32,6 +32,9 @@ export default function InvoicesPage() {
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
   const [viewItems, setViewItems] = useState<any[]>([]);
   const [viewLoading, setViewLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'list' | 'quick'>('list');
+  const [quickForm, setQuickForm] = useState({ client_id: '', product_id: '', total_weight: 0, caisse_type_id: '', caisse_count: 0, notify_collectors: true });
+  const [quickClientSearch, setQuickClientSearch] = useState('');
 
   useEffect(() => { load(); loadCaisseTypes(); }, []);
   const load = () => Promise.all([
@@ -213,6 +216,51 @@ export default function InvoicesPage() {
   };
   const hasActiveFilters = searchQuery || filterDateFrom || filterDateTo;
 
+  const quickNetWeight = useMemo(() => {
+    const ct = caisseTypes.find((c: any) => c.id === quickForm.caisse_type_id);
+    const tare = ct ? (Number(ct.tare) || 0) * (quickForm.caisse_count || 0) : 0;
+    return Math.max(0, (quickForm.total_weight || 0) - tare);
+  }, [quickForm.total_weight, quickForm.caisse_type_id, quickForm.caisse_count, caisseTypes]);
+
+  const quickProduct = useMemo(() => products.find((p: any) => p.id === quickForm.product_id), [quickForm.product_id, products]);
+  const quickPrice = quickProduct ? Number(quickProduct.price) || 0 : 0;
+  const quickDue = quickNetWeight * quickPrice;
+
+  const quickFilteredClients = useMemo(() => {
+    if (!quickClientSearch.trim()) return clients;
+    const q = quickClientSearch.toLowerCase();
+    return clients.filter((c: any) => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q) || (c.address || '').toLowerCase().includes(q));
+  }, [quickClientSearch, clients]);
+
+  const submitQuickInvoice = async () => {
+    if (!quickForm.client_id || !quickForm.product_id || quickForm.total_weight <= 0) return;
+    try {
+      const caisses = quickForm.caisse_type_id && quickForm.caisse_count > 0
+        ? [{ caisse_type_id: quickForm.caisse_type_id, caisse_count: quickForm.caisse_count }]
+        : [];
+      await api.invoices.create({
+        client_id: quickForm.client_id,
+        due_date: new Date().toISOString().split('T')[0],
+        items: [{ product_id: quickForm.product_id, total_weight: quickForm.total_weight, price: quickPrice, caisses }],
+        notify_collectors: quickForm.notify_collectors,
+      });
+      showToast(t('Invoice created'), 'success');
+      setQuickForm({ client_id: '', product_id: '', total_weight: 0, caisse_type_id: '', caisse_count: 0, notify_collectors: true });
+      setQuickClientSearch('');
+      load();
+    } catch (err: any) {
+      showToast(err.message || 'Failed', 'error');
+    }
+  };
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 z-50 px-4 py-2.5 rounded-xl shadow-lg text-white text-sm font-medium ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  };
+
   const getBadge = (status: string) => {
     const map: Record<string, string> = { unpaid: 'warning', partial: 'info', paid: 'success', overdue: 'danger' };
     return `badge bg-${map[status] || 'secondary'}`;
@@ -273,10 +321,122 @@ export default function InvoicesPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4 className="mb-0"><i className="bi bi-receipt me-2" />{t('Invoices')}</h4>
-        {user?.role !== 'collector' && <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Create Invoice')}</button>}
+        {user?.role !== 'collector' && activeTab === 'list' && <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Create Invoice')}</button>}
       </div>
 
-      <div className="card mb-3 border-0 shadow-sm">
+      <ul className="nav nav-tabs mb-3">
+        <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'list' ? 'active' : ''}`} onClick={() => setActiveTab('list')}>
+            <i className="bi bi-list-ul me-1" />{t('All Invoices')}
+          </button>
+        </li>
+        <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'quick' ? 'active' : ''}`} onClick={() => { setActiveTab('quick'); loadProducts(); }}>
+            <i className="bi bi-lightning me-1" />{t('Quick Invoice')}
+          </button>
+        </li>
+      </ul>
+
+      {activeTab === 'quick' ? (
+        <div className="card border-0 shadow-sm">
+          <div className="card-body">
+            <h6 className="mb-3"><i className="bi bi-lightning-fill text-warning me-2" />{t('Quick Invoice — Single Item')}</h6>
+            <div className="row g-3">
+              <div className="col-md-6 position-relative">
+                <label className="form-label">{t('Client')}</label>
+                <input className="form-control" placeholder={t('Search client...')} value={quickClientSearch}
+                  onChange={e => {
+                    setQuickClientSearch(e.target.value);
+                    const match = clients.find((c: any) => c.name.toLowerCase() === e.target.value.toLowerCase());
+                    if (match) setQuickForm({ ...quickForm, client_id: match.id });
+                    else setQuickForm({ ...quickForm, client_id: '' });
+                  }} />
+                {quickClientSearch && !quickForm.client_id && (
+                  <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 200, overflow: 'auto' }}>
+                    {quickFilteredClients.slice(0, 20).map((c: any) => (
+                      <button key={c.id} type="button" className="list-group-item list-group-item-action py-2"
+                        onClick={() => { setQuickClientSearch(c.name); setQuickForm({ ...quickForm, client_id: c.id }); }}>
+                        <div className="fw-medium">{c.name}</div>
+                        <small className="text-muted">{c.phone || ''} {c.address ? `• ${c.address}` : ''}</small>
+                      </button>
+                    ))}
+                    {quickFilteredClients.length === 0 && <div className="list-group-item text-muted small">{t('No clients found')}</div>}
+                  </div>
+                )}
+                {quickForm.client_id && quickClientSearch && (
+                  <span className="position-absolute" style={{ right: 10, top: 34 }}><i className="bi bi-check-circle text-success" /></span>
+                )}
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">{t('Product')}</label>
+                <select className="form-select" value={quickForm.product_id} onChange={e => setQuickForm({ ...quickForm, product_id: e.target.value })}>
+                  <option value="">{t('Select product...')}</option>
+                  {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — {Number(p.price).toFixed(2)}/kg</option>)}
+                </select>
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">{t('Total Weight (kg)')}</label>
+                <input type="number" step="0.5" min="0.1" className="form-control" value={quickForm.total_weight || ''}
+                  onChange={e => setQuickForm({ ...quickForm, total_weight: e.target.value === '' ? 0 : Number(e.target.value) })} />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">{t('Caisse Type')}</label>
+                <select className="form-select" value={quickForm.caisse_type_id} onChange={e => setQuickForm({ ...quickForm, caisse_type_id: e.target.value })}>
+                  <option value="">{t('None')}</option>
+                  {caisseTypes.map((ct: any) => <option key={ct.id} value={ct.id}>{ct.name} ({(Number(ct.tare) || 0).toFixed(3)}kg)</option>)}
+                </select>
+              </div>
+              <div className="col-md-2">
+                <label className="form-label">{t('Caisse Qty')}</label>
+                <input type="number" min="0" className="form-control" value={quickForm.caisse_count || ''}
+                  onChange={e => setQuickForm({ ...quickForm, caisse_count: e.target.value === '' ? 0 : Number(e.target.value) })} />
+              </div>
+              <div className="col-md-2 d-flex align-items-end">
+                <div className="form-check">
+                  <input className="form-check-input" type="checkbox" id="notifyCollectors"
+                    checked={quickForm.notify_collectors} onChange={e => setQuickForm({ ...quickForm, notify_collectors: e.target.checked })} />
+                  <label className="form-check-label small" htmlFor="notifyCollectors">{t('Notify collectors')}</label>
+                </div>
+              </div>
+            </div>
+
+            <div className="row mt-4 g-3">
+              <div className="col-md-3">
+                <div className="card bg-light border-0">
+                  <div className="card-body text-center py-3">
+                    <small className="text-muted d-block">{t('Net Weight')}</small>
+                    <strong className="fs-5">{quickNetWeight.toFixed(2)} kg</strong>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-3">
+                <div className="card bg-light border-0">
+                  <div className="card-body text-center py-3">
+                    <small className="text-muted d-block">{t('Price')}</small>
+                    <strong className="fs-5">{quickPrice.toFixed(2)}</strong>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-3">
+                <div className="card bg-light border-0">
+                  <div className="card-body text-center py-3">
+                    <small className="text-muted d-block">{t('Due Amount')}</small>
+                    <strong className={`fs-5 ${quickDue > 0 ? 'text-primary' : 'text-success'}`}>{quickDue.toFixed(2)}</strong>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-3 d-flex align-items-end">
+                <button className="btn btn-primary w-100 py-2" onClick={submitQuickInvoice}
+                  disabled={!quickForm.client_id || !quickForm.product_id || quickForm.total_weight <= 0}>
+                  <i className="bi bi-send me-1" />{t('Create & Notify')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+        <div className="card mb-3 border-0 shadow-sm">
         <div className="card-body py-3">
           <div className="d-flex gap-2 align-items-center flex-wrap">
             <div className="input-group" style={{ maxWidth: 360 }}>
@@ -393,6 +553,8 @@ export default function InvoicesPage() {
           <Pagination total={filteredInvoices.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </div>
       </div>
+        </>
+      )}
 
       {showCreate && (
         <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
