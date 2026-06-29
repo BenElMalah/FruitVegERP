@@ -580,6 +580,10 @@ export default function ClientsPage() {
                     ) : (
                       <div className="text-center text-muted py-4">{t('No caisse data')}</div>
                     )}
+                    <div className="text-muted small mt-2 px-2">
+                      <i className="bi bi-info-circle me-1" />
+                      {t('Note: The first return transaction per client is excluded from calculations.')}
+                    </div>
                   </>
                 )}
               </div>

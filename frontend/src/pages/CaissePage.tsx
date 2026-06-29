@@ -70,9 +70,26 @@ export default function CaissePage() {
   const totalOut = useMemo(() =>
     filteredMovements.filter(m => m.caisse_types?.category !== 'client' && m.movement_type === 'out').reduce((sum, m) => sum + m.quantity, 0)
   , [filteredMovements]);
+
+  // Identify first return per client (earliest created_at) to exclude from totals
+  const firstReturnIds = useMemo(() => {
+    const ids = new Set<string>();
+    const byClient = new Map<string, any>();
+    movements
+      .filter(m => m.movement_type === 'return')
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .forEach(m => {
+        if (!byClient.has(m.client_id)) {
+          byClient.set(m.client_id, m);
+          ids.add(m.id);
+        }
+      });
+    return ids;
+  }, [movements]);
+
   const totalReturned = useMemo(() =>
-    filteredMovements.filter(m => m.caisse_types?.category !== 'client' && m.movement_type === 'return').reduce((sum, m) => sum + m.quantity, 0)
-  , [filteredMovements]);
+    filteredMovements.filter(m => m.caisse_types?.category !== 'client' && m.movement_type === 'return' && !firstReturnIds.has(m.id)).reduce((sum, m) => sum + m.quantity, 0)
+  , [filteredMovements, firstReturnIds]);
 
   const hasActiveFilters = searchClient || filterDateFrom || filterDateTo || filterMinQty || filterType;
   const resetFilters = () => { setSearchClient(''); setFilterDateFrom(''); setFilterDateTo(''); setFilterMinQty(''); setFilterType(''); setPage(1); };
@@ -229,9 +246,13 @@ export default function CaissePage() {
                       <td>{m.caisse_types?.name}</td>
                       <td>{m.quantity}</td>
                       <td>
-                        <span className={`badge bg-${m.movement_type === 'out' ? 'warning' : 'success'}`}>
-                          {t(m.movement_type)}
-                        </span>
+                        {m.movement_type === 'return' && firstReturnIds.has(m.id) ? (
+                          <span className="badge bg-secondary">{t('Excluded')}</span>
+                        ) : (
+                          <span className={`badge bg-${m.movement_type === 'out' ? 'warning' : 'success'}`}>
+                            {t(m.movement_type)}
+                          </span>
+                        )}
                       </td>
                       <td><small>{new Date(m.created_at).toLocaleDateString()}</small></td>
                       <td>

@@ -132,10 +132,16 @@ router.put('/movements/:id', authorize('boss', 'manager'), async (req: AuthReque
 router.get('/balance/:clientId', async (req: AuthRequest, res: Response) => {
   const { data: movements, error } = await supabaseAdmin
     .from('caisse_movements')
-    .select('caisse_type_id, quantity, movement_type, caisse_types(name, category)')
+    .select('caisse_type_id, quantity, movement_type, created_at, id, caisse_types(name, category)')
     .eq('client_id', req.params.clientId);
 
   if (error) return res.status(400).json({ error: error.message });
+
+  // Find the first return record for this client (earliest created_at)
+  const returnMovements = (movements || [])
+    .filter((m: any) => m.movement_type === 'return')
+    .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const firstReturn = returnMovements.length > 0 ? returnMovements[0] : null;
 
   const balance = new Map<string, { name: string; category: string; out: number; returned: number; lost: number; damaged: number }>();
 
@@ -147,7 +153,11 @@ router.get('/balance/:clientId', async (req: AuthRequest, res: Response) => {
     }
     const b = balance.get(key)!;
     if (m.movement_type === 'out') b.out += m.quantity;
-    else if (m.movement_type === 'return') b.returned += m.quantity;
+    else if (m.movement_type === 'return') {
+      // Exclude the first return record from counting
+      if (firstReturn && m.id === firstReturn.id) return;
+      b.returned += m.quantity;
+    }
     else if (m.movement_type === 'lost') b.lost += m.quantity;
     else if (m.movement_type === 'damaged') b.damaged += m.quantity;
   });

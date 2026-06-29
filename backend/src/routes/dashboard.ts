@@ -116,9 +116,20 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
   ] = await Promise.all([
     supabaseAdmin.from('invoices').select('total, remaining_amount, created_at, status')
       .gte('created_at', startStr),
-    supabaseAdmin.from('caisse_movements').select('quantity, movement_type, created_at')
+    supabaseAdmin.from('caisse_movements').select('client_id, id, quantity, movement_type, created_at')
       .gte('created_at', startStr),
   ]);
+
+  // Find first return per client (earliest created_at) to exclude from counting
+  const firstReturnPerClient = new Map<string, string>(); // client_id -> movement id
+  (movements || [])
+    .filter((m: any) => m.movement_type === 'return')
+    .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .forEach((m: any) => {
+      if (!firstReturnPerClient.has(m.client_id)) {
+        firstReturnPerClient.set(m.client_id, m.id);
+      }
+    });
 
   const groupKey = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -144,6 +155,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     if (m.movement_type === 'out') {
       outMap.set(key, (outMap.get(key) || 0) + m.quantity);
     } else if (m.movement_type === 'return') {
+      // Exclude the first return per client from counting
+      if (firstReturnPerClient.get(m.client_id) === m.id) return;
       returnedMap.set(key, (returnedMap.get(key) || 0) + m.quantity);
     }
   });
