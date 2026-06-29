@@ -767,6 +767,12 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-slate-500">Net kg</span>
+                    <span className="text-sm font-bold text-slate-800">
+                      {savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + netWeight(e.weight, e.caisseItems || []), 0).toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
                     <span className="text-[11px] text-slate-500">Total Due</span>
                     <span className="text-sm font-bold text-indigo-700">
                       {savedForTruck.filter(e => e.status !== 'cancelled').reduce((s, e) => s + dueAmount(e.weight, e.caisseItems || [], e.price), 0).toFixed(2)}
