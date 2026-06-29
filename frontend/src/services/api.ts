@@ -140,10 +140,17 @@ export const api = {
   },
   stock: {
     list: (warehouse_id?: string) => request<any[]>(`/stock${warehouse_id ? `?warehouse_id=${warehouse_id}` : ''}`),
-    adjust: (data: { product_id: string; quantity: number; warehouse_id?: string; truck_id?: string }) =>
+    adjust: (data: { product_id: string; quantity: number; warehouse_id?: string; truck_id?: string; adjustment_date?: string }) =>
       request<any>('/stock/adjust', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, quantity: number, truck_id?: string) =>
       request<any>(`/stock/${id}`, { method: 'PUT', body: JSON.stringify({ quantity, truck_id }) }),
+    movements: (date?: string, product_id?: string) => {
+      const params = new URLSearchParams();
+      if (date) params.set('date', date);
+      if (product_id) params.set('product_id', product_id);
+      const qs = params.toString();
+      return request<any[]>(`/stock/movements${qs ? `?${qs}` : ''}`);
+    },
   },
   warehouses: {
     list: () => request<any[]>('/warehouses'),

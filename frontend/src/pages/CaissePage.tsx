@@ -46,7 +46,7 @@ export default function CaissePage() {
   };
 
   const filteredClients = useMemo(() =>
-    clientSearch ? clients.filter((c: any) => c.name.toLowerCase().includes(clientSearch.toLowerCase())) : clients
+    clientSearch ? clients.filter((c: any) => c.name.toLowerCase().includes(clientSearch.toLowerCase())).sort((a: any, b: any) => a.name.localeCompare(b.name)) : clients.sort((a: any, b: any) => a.name.localeCompare(b.name))
   , [clients, clientSearch]);
 
   const filteredMovements = useMemo(() => {
@@ -62,10 +62,32 @@ export default function CaissePage() {
     return result;
   }, [movements, filterType, searchClient, filterDateFrom, filterDateTo, filterMinQty]);
 
+  // Consolidate same-day/same-client/same-type movements into one row
+  const consolidatedMovements = useMemo(() => {
+    const groups = new Map<string, { client_id: string; caisse_type_id: string; movement_type: string; date: string; quantity: number; clients: any; caisse_types: any; earliest: string; ids: string[] }>();
+    for (const m of filteredMovements) {
+      const date = m.created_at ? m.created_at.split('T')[0] : '';
+      const key = `${m.client_id}_${m.caisse_type_id}_${m.movement_type}_${date}`;
+      if (groups.has(key)) {
+        const g = groups.get(key)!;
+        g.quantity += m.quantity;
+        g.ids.push(m.id);
+        if (m.created_at < g.earliest) g.earliest = m.created_at;
+      } else {
+        groups.set(key, {
+          client_id: m.client_id, caisse_type_id: m.caisse_type_id, movement_type: m.movement_type,
+          date, quantity: m.quantity, clients: m.clients, caisse_types: m.caisse_types,
+          earliest: m.created_at, ids: [m.id],
+        });
+      }
+    }
+    return Array.from(groups.values()).sort((a, b) => a.earliest > b.earliest ? -1 : a.earliest < b.earliest ? 1 : 0);
+  }, [filteredMovements]);
+
   const pagedMovements = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filteredMovements.slice(start, start + PAGE_SIZE);
-  }, [filteredMovements, page]);
+    return consolidatedMovements.slice(start, start + PAGE_SIZE);
+  }, [consolidatedMovements, page]);
 
   const totalOut = useMemo(() =>
     filteredMovements.filter(m => m.caisse_types?.category !== 'client' && m.movement_type === 'out').reduce((sum, m) => sum + m.quantity, 0)
@@ -240,13 +262,13 @@ export default function CaissePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedMovements.map(m => (
-                    <tr key={m.id}>
+                  {pagedMovements.map((m, idx) => (
+                    <tr key={`${m.client_id}_${m.caisse_type_id}_${m.movement_type}_${m.date}_${idx}`}>
                       <td>{m.clients?.name}</td>
                       <td>{m.caisse_types?.name}</td>
-                      <td>{m.quantity}</td>
+                      <td className="fw-bold">{m.quantity}</td>
                       <td>
-                        {m.movement_type === 'return' && firstReturnIds.has(m.id) ? (
+                        {m.movement_type === 'return' && m.ids.some((id: string) => firstReturnIds.has(id)) ? (
                           <span className="badge bg-secondary">{t('Excluded')}</span>
                         ) : (
                           <span className={`badge bg-${m.movement_type === 'out' ? 'warning' : 'success'}`}>
@@ -254,14 +276,8 @@ export default function CaissePage() {
                           </span>
                         )}
                       </td>
-                      <td><small>{new Date(m.created_at).toLocaleDateString()}</small></td>
-                      <td>
-                        {canEdit && (
-                          <button className="btn btn-sm btn-outline-primary" onClick={() => openEdit(m)} title={t('Edit')}>
-                            <i className="bi bi-pencil" />
-                          </button>
-                        )}
-                      </td>
+                      <td><small>{new Date(m.earliest).toLocaleDateString()}</small></td>
+                      <td></td>
                     </tr>
                   ))}
                   {filteredMovements.length > 0 && (
@@ -278,11 +294,11 @@ export default function CaissePage() {
                       <td>{totalOut - totalReturned}</td>
                     </tr>
                   )}
-                  {!filteredMovements.length && <tr><td colSpan={6} className="text-center text-muted py-4">{t('No movements yet')}</td></tr>}
+                  {!consolidatedMovements.length && <tr><td colSpan={6} className="text-center text-muted py-4">{t('No movements yet')}</td></tr>}
                 </tbody>
               </table>
               </div>
-              <Pagination total={filteredMovements.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+              <Pagination total={consolidatedMovements.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
             </div>
           </div>
         </>

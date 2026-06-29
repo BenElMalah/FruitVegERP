@@ -93,6 +93,8 @@ export default function DailyArrivals() {
   const [finalizing, setFinalizing] = useState(false);
   const [overviewTab, setOverviewTab] = useState<'orders' | 'expenses' | 'stock'>('orders');
   const [stockItems, setStockItems] = useState<any[]>([]);
+  const [stockMovements, setStockMovements] = useState<any[]>([]);
+  const [stockDate, setStockDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [expenses, setExpenses] = useState<{ id: string; label: string; amount: number }[]>([]);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [showClientDropdown, setShowClientDropdown] = useState<string | null>(null);
@@ -166,7 +168,8 @@ export default function DailyArrivals() {
   useEffect(() => {
     if (overviewTab !== 'stock') return;
     api.stock.list().then(setStockItems).catch(() => {});
-  }, [overviewTab, activeTruckId]);
+    api.stock.movements(stockDate).then(setStockMovements).catch(() => {});
+  }, [overviewTab, activeTruckId, stockDate]);
 
   useEffect(() => {
     if (!activeTruckId || !selectedDate) return;
@@ -855,10 +858,14 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                 <h3 className="text-xs font-bold text-slate-700">Truck Stock</h3>
                 <span className="text-[10px] text-slate-400">{activeTruck?.products?.name || truckProductName}</span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
                   <span className="text-xs text-slate-600">Current stock</span>
                   <span className="text-lg font-bold text-indigo-700">{stockCurrentQty.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="date" value={stockDate} onChange={e => setStockDate(e.target.value)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-300" />
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="number" step="0.5" min="0" id="stock-qty"
@@ -869,16 +876,35 @@ onKeyDown={e => handleKeyDown(e, row.id)}
                     const qty = el ? Number(el.value) : 0;
                     if (!qty || qty <= 0) return;
                     if (!truckProduct) { showToastMsg('No product found for this truck', 'error'); return; }
-                    api.stock.adjust({ product_id: truckProduct.id, quantity: qty }).then(() => {
+                    api.stock.adjust({ product_id: truckProduct.id, quantity: qty, adjustment_date: stockDate }).then(() => {
                       api.stock.list().then(setStockItems);
+                      api.stock.movements(stockDate).then(setStockMovements);
                       el.value = '';
-                      showToastMsg('Added ' + qty + ' to stock', 'success');
+                      showToastMsg('Added ' + qty + ' to stock for ' + stockDate, 'success');
                     }).catch((err: any) => showToastMsg(err.message || 'Failed', 'error'));
                   }}
                     className="btn-primary px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95">
                     Add to Stock
                   </button>
                 </div>
+                {stockMovements.length > 0 && (
+                  <div className="mt-2">
+                    <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Stock entries for {stockDate}</h4>
+                    <div className="space-y-1">
+                      {stockMovements.map((mv: any) => (
+                        <div key={mv.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-100">
+                          <div>
+                            <span className="text-xs font-medium text-slate-700">{mv.products?.name || 'Product'}</span>
+                            <span className="text-[10px] text-slate-400 ml-2">{mv.notes || ''}</span>
+                          </div>
+                          <span className={`text-xs font-bold ${mv.quantity > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {mv.quantity > 0 ? '+' : ''}{mv.quantity}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

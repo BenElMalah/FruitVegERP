@@ -23,11 +23,36 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   res.json(data);
 });
 
+router.get('/movements', async (req: AuthRequest, res: Response) => {
+  const { date, product_id } = req.query;
+  let query = supabaseAdmin
+    .from('stock_movements')
+    .select('*, products(name, unit)')
+    .order('created_at', { ascending: false });
+
+  if (date) query = query.eq('movement_date', date);
+  if (product_id) query = query.eq('product_id', product_id);
+
+  const { data, error } = await query;
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
 router.post('/adjust', authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
-  const { product_id, quantity, warehouse_id, truck_id } = req.body;
+  const { product_id, quantity, warehouse_id, truck_id, adjustment_date } = req.body;
 
   if (!product_id || quantity === undefined) {
     return res.status(400).json({ error: 'product_id and quantity are required' });
+  }
+
+  // Record stock movement with date
+  if (adjustment_date) {
+    await supabaseAdmin.from('stock_movements').insert({
+      product_id,
+      quantity: Number(quantity),
+      movement_date: adjustment_date,
+      created_by: req.user!.id,
+    });
   }
 
   // Upsert stock
