@@ -46,7 +46,7 @@ export default function CaissePage() {
   };
 
   const filteredClients = useMemo(() =>
-    clientSearch ? clients.filter((c: any) => c.name.toLowerCase().includes(clientSearch.toLowerCase())).sort((a: any, b: any) => a.name.localeCompare(b.name)) : clients.sort((a: any, b: any) => a.name.localeCompare(b.name))
+    clientSearch ? clients.filter((c: any) => c.name.toLowerCase().startsWith(clientSearch.toLowerCase())).sort((a: any, b: any) => a.name.localeCompare(b.name)) : clients.sort((a: any, b: any) => a.name.localeCompare(b.name))
   , [clients, clientSearch]);
 
   const filteredMovements = useMemo(() => {
