@@ -27,9 +27,8 @@ export default function PaymentsPage() {
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [searchClient, setSearchClient] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -92,20 +91,14 @@ export default function PaymentsPage() {
       result = result.filter(p => (p.clients?.name || '').toLowerCase().includes(q));
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    if (!dateFrom && !dateTo) {
-      result = result.filter(p => {
-        const d = new Date(p.created_at).toISOString().split('T')[0];
-        return d === today;
-      });
-    } else {
-      if (dateFrom) result = result.filter(p => p.created_at && p.created_at >= dateFrom);
-      if (dateTo) result = result.filter(p => p.created_at && p.created_at <= dateTo + 'T23:59:59');
-    }
+    result = result.filter(p => {
+      const d = new Date(p.created_at).toISOString().split('T')[0];
+      return d === selectedDate;
+    });
 
     const start = (page - 1) * PAGE_SIZE;
     return result.slice(start, start + PAGE_SIZE);
-  }, [payments, searchClient, dateFrom, dateTo, page]);
+  }, [payments, searchClient, selectedDate, page]);
 
   const filteredCount = useMemo(() => {
     let result = payments;
@@ -113,18 +106,12 @@ export default function PaymentsPage() {
       const q = searchClient.toLowerCase();
       result = result.filter(p => (p.clients?.name || '').toLowerCase().includes(q));
     }
-    const today = new Date().toISOString().split('T')[0];
-    if (!dateFrom && !dateTo) {
-      result = result.filter(p => {
-        const d = new Date(p.created_at).toISOString().split('T')[0];
-        return d === today;
-      });
-    } else {
-      if (dateFrom) result = result.filter(p => p.created_at && p.created_at >= dateFrom);
-      if (dateTo) result = result.filter(p => p.created_at && p.created_at <= dateTo + 'T23:59:59');
-    }
+    result = result.filter(p => {
+      const d = new Date(p.created_at).toISOString().split('T')[0];
+      return d === selectedDate;
+    });
     return result.length;
-  }, [payments, searchClient, dateFrom, dateTo]);
+  }, [payments, searchClient, selectedDate]);
 
   const filteredClients = useMemo(() =>
     clientSearch ? clients.filter((c: any) => c.name.toLowerCase().includes(clientSearch.toLowerCase())) : clients
@@ -156,13 +143,48 @@ export default function PaymentsPage() {
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4 className="mb-0"><i className="bi bi-cash-coin me-2" />{t('Payments')}</h4>
+        <h4 className="mb-0"><i className="bi bi-cash-coin me-2" />{t('Today Payment')}</h4>
         {canCreate && <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Register Payment')}</button>}
       </div>
 
       <div className="card mb-3 border-0 shadow-sm">
         <div className="card-body py-3">
           <div className="d-flex gap-2 align-items-center flex-wrap">
+            <div className="d-flex align-items-center gap-1 border rounded px-2 py-1 bg-light">
+              <button className="btn btn-sm btn-outline-secondary border-0 p-1" onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() - 1);
+                setSelectedDate(d.toISOString().split('T')[0]);
+                setPage(1);
+              }} title={t('Previous day')}>
+                <i className="bi bi-chevron-right" />
+              </button>
+              <span className="px-2 fw-semibold" style={{ minWidth: 140, textAlign: 'center', fontSize: 15 }}>
+                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              <button className="btn btn-sm btn-outline-secondary border-0 p-1" onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() + 1);
+                if (d.toISOString().split('T')[0] <= new Date().toISOString().split('T')[0]) {
+                  setSelectedDate(d.toISOString().split('T')[0]);
+                  setPage(1);
+                }
+              }} title={t('Next day')} disabled={selectedDate >= new Date().toISOString().split('T')[0]}>
+                <i className="bi bi-chevron-left" />
+              </button>
+              <div className="position-relative ms-1">
+                <button className="btn btn-sm btn-outline-secondary border-0 p-1" onClick={() => setShowCalendar(!showCalendar)} title={t('Pick date')}>
+                  <i className="bi bi-calendar-event" />
+                </button>
+                {showCalendar && (
+                  <input type="date" className="form-control form-control-sm position-absolute" style={{ zIndex: 1050, top: '100%', right: 0, width: 220 }}
+                    value={selectedDate} max={new Date().toISOString().split('T')[0]}
+                    onChange={e => { setSelectedDate(e.target.value); setShowCalendar(false); setPage(1); }}
+                    onBlur={() => setTimeout(() => setShowCalendar(false), 200)}
+                  />
+                )}
+              </div>
+            </div>
             <div className="input-group" style={{ maxWidth: 300 }}>
               <span className="input-group-text bg-light"><i className="bi bi-search" /></span>
               <input type="text" className="form-control" placeholder={t('Search client...')}
@@ -170,36 +192,10 @@ export default function PaymentsPage() {
                 onChange={e => { setSearchClient(e.target.value); setPage(1); }}
               />
             </div>
-            <button className={`btn ${showDateFilter ? 'btn-secondary' : 'btn-outline-secondary'}`}
-              onClick={() => setShowDateFilter(!showDateFilter)}>
-              <i className="bi bi-calendar me-1" />{t('Date Filter')}
-              {(dateFrom || dateTo) && <span className="badge bg-danger ms-1">!</span>}
-            </button>
-            {(dateFrom || dateTo) && (
-              <button className="btn btn-outline-danger btn-sm" onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }}>
-                <i className="bi bi-x-circle me-1" />{t('Clear')}
-              </button>
-            )}
             <span className="text-muted ms-auto small">
               {filteredCount} {t('payments')}
             </span>
           </div>
-          {showDateFilter && (
-            <div className="border-top pt-3 mt-3">
-              <div className="d-flex gap-2 align-items-end flex-wrap">
-                <div style={{ minWidth: 150 }}>
-                  <label className="form-label small text-muted mb-1">{t('From')}</label>
-                  <input type="date" className="form-control form-control-sm" value={dateFrom}
-                    onChange={e => { setDateFrom(e.target.value); setPage(1); }} />
-                </div>
-                <div style={{ minWidth: 150 }}>
-                  <label className="form-label small text-muted mb-1">{t('To')}</label>
-                  <input type="date" className="form-control form-control-sm" value={dateTo}
-                    onChange={e => { setDateTo(e.target.value); setPage(1); }} />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
