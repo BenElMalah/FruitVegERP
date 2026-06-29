@@ -252,4 +252,31 @@ input[type=number] {
   .d-flex.gap-2.flex-wrap {
     gap: 0.35rem !important;
   }
+
+  /* Daily Arrivals: client search input */
+  .arrival-search-input {
+    min-height: 48px !important;
+    font-size: 16px !important;
+    padding: 10px 14px !important;
+    line-height: 1.4;
+    -webkit-text-size-adjust: 100%;
+  }
+  .arrival-search-input::placeholder {
+    font-size: 15px;
+    opacity: 0.5;
+  }
+  /* Plus button next to search */
+  .arrival-search-input + button,
+  .arrival-search-input ~ button {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px;
+    min-height: 36px;
+  }
+  /* Dropdown items touch-friendly */
+  .arrival-dropdown button {
+    min-height: 44px;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+  }
 }

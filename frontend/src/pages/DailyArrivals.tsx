@@ -622,7 +622,7 @@ export default function DailyArrivals() {
                             onKeyDown={e => handleKeyDown(e, row.id)}
                             placeholder="Search client..."
                             readOnly={isPast}
-                            className={`w-full px-2.5 py-1.5 pr-8 border rounded-lg text-xs text-slate-700 placeholder-slate-300 focus:outline-none transition-all bg-white ${isPast ? 'border-transparent bg-transparent cursor-default' : 'border-slate-200 focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-300'}`}
+                            className={`arrival-search-input w-full min-h-[44px] sm:min-h-0 px-3 sm:px-2.5 py-2.5 sm:py-1.5 pr-8 border rounded-lg text-base sm:text-xs text-slate-700 placeholder-slate-400 focus:outline-none transition-all bg-white ${isPast ? 'border-transparent bg-transparent cursor-default' : 'border-slate-200 focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-300'}`}
                           />
                           {!isPast && (
                             <button type="button" onClick={(e) => { e.preventDefault(); setDrawerRowId(row.id); setDrawerName(''); setDrawerPhone(''); setDrawerRegion(''); setShowDrawer(true); }}
@@ -635,7 +635,7 @@ export default function DailyArrivals() {
                           <span className="absolute right-9 top-2.5 text-[10px] text-emerald-500 font-bold">✓</span>
                         )}
                         {showDropdown && (
-                          <div className="absolute left-3 right-3 top-full mt-0.5 z-[100] bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
+                          <div className="arrival-dropdown absolute left-3 right-3 top-full mt-0.5 z-[100] bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
                             {matches.map((c: any) => (
                               <button key={c.id} type="button" onMouseDown={() => { updateRow(row.id, { clientId: c.id, clientName: c.name, searchText: c.name }); setShowClientDropdown(null); }}
                                 className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 border-0">
