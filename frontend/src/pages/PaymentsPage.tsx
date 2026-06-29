@@ -28,6 +28,8 @@ export default function PaymentsPage() {
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [searchClient, setSearchClient] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
+  const [showRangePicker, setShowRangePicker] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [error, setError] = useState('');
 
@@ -93,12 +95,15 @@ export default function PaymentsPage() {
 
     result = result.filter(p => {
       const d = new Date(p.created_at).toISOString().split('T')[0];
+      if (dateRange.from && dateRange.to) {
+        return d >= dateRange.from && d <= dateRange.to;
+      }
       return d === selectedDate;
     });
 
     const start = (page - 1) * PAGE_SIZE;
     return result.slice(start, start + PAGE_SIZE);
-  }, [payments, searchClient, selectedDate, page]);
+  }, [payments, searchClient, selectedDate, dateRange, page]);
 
   const filteredCount = useMemo(() => {
     let result = payments;
@@ -108,10 +113,13 @@ export default function PaymentsPage() {
     }
     result = result.filter(p => {
       const d = new Date(p.created_at).toISOString().split('T')[0];
+      if (dateRange.from && dateRange.to) {
+        return d >= dateRange.from && d <= dateRange.to;
+      }
       return d === selectedDate;
     });
     return result.length;
-  }, [payments, searchClient, selectedDate]);
+  }, [payments, searchClient, selectedDate, dateRange]);
 
   const filteredClients = useMemo(() =>
     clientSearch ? clients.filter((c: any) => c.name.toLowerCase().includes(clientSearch.toLowerCase())) : clients
@@ -155,33 +163,69 @@ export default function PaymentsPage() {
                 const d = new Date(selectedDate);
                 d.setDate(d.getDate() - 1);
                 setSelectedDate(d.toISOString().split('T')[0]);
+                setDateRange({ from: '', to: '' });
                 setPage(1);
               }} title={t('Previous day')}>
-                <i className="bi bi-chevron-right" />
+                <i className="bi bi-chevron-left" style={{ transform: 'rotate(180deg)' }} />
               </button>
               <span className="px-2 fw-semibold" style={{ minWidth: 140, textAlign: 'center', fontSize: 15 }}>
-                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                {dateRange.from && dateRange.to
+                  ? `${new Date(dateRange.from + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — ${new Date(dateRange.to + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                  : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                }
               </span>
               <button className="btn btn-sm btn-outline-secondary border-0 p-1" onClick={() => {
                 const d = new Date(selectedDate);
                 d.setDate(d.getDate() + 1);
                 if (d.toISOString().split('T')[0] <= new Date().toISOString().split('T')[0]) {
                   setSelectedDate(d.toISOString().split('T')[0]);
+                  setDateRange({ from: '', to: '' });
                   setPage(1);
                 }
               }} title={t('Next day')} disabled={selectedDate >= new Date().toISOString().split('T')[0]}>
                 <i className="bi bi-chevron-left" />
               </button>
               <div className="position-relative ms-1">
-                <button className="btn btn-sm btn-outline-secondary border-0 p-1" onClick={() => setShowCalendar(!showCalendar)} title={t('Pick date')}>
+                <button className="btn btn-sm btn-outline-secondary border-0 p-1" onClick={() => { setShowCalendar(!showCalendar); setShowRangePicker(false); }} title={t('Pick date')}>
                   <i className="bi bi-calendar-event" />
                 </button>
                 {showCalendar && (
                   <input type="date" className="form-control form-control-sm position-absolute" style={{ zIndex: 1050, top: '100%', right: 0, width: 220 }}
                     value={selectedDate} max={new Date().toISOString().split('T')[0]}
-                    onChange={e => { setSelectedDate(e.target.value); setShowCalendar(false); setPage(1); }}
+                    onChange={e => { setSelectedDate(e.target.value); setDateRange({ from: '', to: '' }); setShowCalendar(false); setPage(1); }}
                     onBlur={() => setTimeout(() => setShowCalendar(false), 200)}
                   />
+                )}
+              </div>
+              <div className="position-relative">
+                <button className={`btn btn-sm border-0 p-1 ${dateRange.from && dateRange.to ? 'btn-warning' : 'btn-outline-secondary'}`}
+                  onClick={() => { setShowRangePicker(!showRangePicker); setShowCalendar(false); }} title={t('Date range')}>
+                  <i className="bi bi-calendar-range" />
+                </button>
+                {showRangePicker && (
+                  <div className="position-absolute bg-white border rounded shadow-sm p-3" style={{ zIndex: 1050, top: '100%', right: 0, width: 260 }}>
+                    <div className="mb-2">
+                      <label className="form-label small text-muted mb-1">{t('From')}</label>
+                      <input type="date" className="form-control form-control-sm" value={dateRange.from}
+                        max={dateRange.to || new Date().toISOString().split('T')[0]}
+                        onChange={e => setDateRange(prev => ({ ...prev, from: e.target.value }))} />
+                    </div>
+                    <div className="mb-2">
+                      <label className="form-label small text-muted mb-1">{t('To')}</label>
+                      <input type="date" className="form-control form-control-sm" value={dateRange.to}
+                        min={dateRange.from} max={new Date().toISOString().split('T')[0]}
+                        onChange={e => setDateRange(prev => ({ ...prev, to: e.target.value }))} />
+                    </div>
+                    <div className="d-flex gap-2">
+                      <button className="btn btn-primary btn-sm flex-grow-1" disabled={!dateRange.from || !dateRange.to}
+                        onClick={() => { setShowRangePicker(false); setPage(1); }}>
+                        {t('Apply')}
+                      </button>
+                      <button className="btn btn-outline-secondary btn-sm" onClick={() => { setDateRange({ from: '', to: '' }); setShowRangePicker(false); setPage(1); }}>
+                        {t('Clear')}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
