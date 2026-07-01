@@ -54,7 +54,7 @@ export default function CaissePage() {
     if (filterType) result = result.filter(m => m.caisse_type_id === filterType);
     if (searchClient.trim()) {
       const q = searchClient.toLowerCase();
-      result = result.filter(m => (m.clients?.name || '').toLowerCase().includes(q));
+      result = result.filter(m => (m.clients?.name || '').toLowerCase().startsWith(q));
     }
     if (filterDateFrom) result = result.filter(m => m.created_at && m.created_at >= filterDateFrom);
     if (filterDateTo) result = result.filter(m => m.created_at && m.created_at <= filterDateTo + 'T23:59:59');
@@ -66,7 +66,7 @@ export default function CaissePage() {
   const consolidatedMovements = useMemo(() => {
     const groups = new Map<string, { client_id: string; caisse_type_id: string; movement_type: string; date: string; quantity: number; clients: any; caisse_types: any; earliest: string; ids: string[] }>();
     for (const m of filteredMovements) {
-      const date = m.created_at ? m.created_at.split('T')[0] : '';
+      const date = m.created_at ? new Date(m.created_at).toISOString().split('T')[0] : '';
       const key = `${m.client_id}_${m.caisse_type_id}_${m.movement_type}_${date}`;
       if (groups.has(key)) {
         const g = groups.get(key)!;
