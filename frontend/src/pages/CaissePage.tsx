@@ -195,7 +195,7 @@ export default function CaissePage() {
                       onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
                     />
                   </div>
-                  {showClientDropdown && (
+                  {showClientDropdown && dropdownSearch && (
                     <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 180, overflow: 'auto' }}>
                       {filteredClients.map((c: any) => (
                         <button key={c.id} type="button" className="list-group-item list-group-item-action py-1"
