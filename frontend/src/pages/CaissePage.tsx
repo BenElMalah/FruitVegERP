@@ -17,6 +17,7 @@ export default function CaissePage() {
   const [missing, setMissing] = useState<any[]>([]);
   const [filterType, setFilterType] = useState('');
   const [searchClient, setSearchClient] = useState('');
+  const [dropdownSearch, setDropdownSearch] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterMinQty, setFilterMinQty] = useState('');
@@ -46,8 +47,8 @@ export default function CaissePage() {
   };
 
   const filteredClients = useMemo(() =>
-    clientSearch ? clients.filter((c: any) => c.name.toLowerCase().startsWith(clientSearch.toLowerCase())).sort((a: any, b: any) => a.name.localeCompare(b.name)) : clients.sort((a: any, b: any) => a.name.localeCompare(b.name))
-  , [clients, clientSearch]);
+    dropdownSearch ? clients.filter((c: any) => c.name.toLowerCase().startsWith(dropdownSearch.toLowerCase())).sort((a: any, b: any) => a.name.localeCompare(b.name)) : clients.sort((a: any, b: any) => a.name.localeCompare(b.name))
+  , [clients, dropdownSearch]);
 
   const filteredMovements = useMemo(() => {
     let result = movements;
@@ -114,7 +115,7 @@ export default function CaissePage() {
   , [filteredMovements, firstReturnIds]);
 
   const hasActiveFilters = searchClient || filterDateFrom || filterDateTo || filterMinQty || filterType;
-  const resetFilters = () => { setSearchClient(''); setFilterDateFrom(''); setFilterDateTo(''); setFilterMinQty(''); setFilterType(''); setPage(1); };
+  const resetFilters = () => { setSearchClient(''); setDropdownSearch(''); setFilterDateFrom(''); setFilterDateTo(''); setFilterMinQty(''); setFilterType(''); setPage(1); };
 
   const openCreate = () => {
     setEditId(null);
@@ -188,17 +189,17 @@ export default function CaissePage() {
                   <div className="input-group">
                     <span className="input-group-text bg-light"><i className="bi bi-search" /></span>
                     <input type="text" className="form-control" placeholder={t('Search client...')}
-                      value={searchClient}
-                      onChange={e => { setSearchClient(e.target.value); setPage(1); }}
+                      value={dropdownSearch}
+                      onChange={e => { setDropdownSearch(e.target.value); setShowClientDropdown(true); setPage(1); }}
                       onFocus={() => setShowClientDropdown(true)}
                       onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
                     />
                   </div>
-                  {showClientDropdown && searchClient && (
+                  {showClientDropdown && (
                     <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 180, overflow: 'auto' }}>
                       {filteredClients.map((c: any) => (
                         <button key={c.id} type="button" className="list-group-item list-group-item-action py-1"
-                          onMouseDown={() => { setSearchClient(c.name); setShowClientDropdown(false); setPage(1); }}>
+                          onMouseDown={() => { setSearchClient(c.name); setDropdownSearch(c.name); setShowClientDropdown(false); setPage(1); }}>
                           <div className="fw-medium">{c.name}</div>
                         </button>
                       ))}
