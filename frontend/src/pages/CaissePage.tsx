@@ -186,20 +186,15 @@ export default function CaissePage() {
             <div className="card-body py-3">
               <div className="d-flex gap-2 align-items-center flex-wrap">
                 <div className="position-relative" style={{ maxWidth: 300 }}>
-                  <div className="input-group">
-                    <span className="input-group-text bg-light"><i className="bi bi-search" /></span>
-                    <input type="text" className="form-control" placeholder={t('Search client...')}
-                      value={dropdownSearch}
-                      onChange={e => { setDropdownSearch(e.target.value); setShowClientDropdown(true); setPage(1); }}
-                      onFocus={() => setShowClientDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                    />
-                  </div>
-                  {showClientDropdown && dropdownSearch && (
+                  <input type="text" className="form-control" placeholder={t('Search client...')}
+                    value={dropdownSearch}
+                    onChange={e => { setDropdownSearch(e.target.value); setPage(1); }}
+                  />
+                  {dropdownSearch && (
                     <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 180, overflow: 'auto' }}>
                       {filteredClients.map((c: any) => (
                         <button key={c.id} type="button" className="list-group-item list-group-item-action py-1"
-                          onMouseDown={() => { setSearchClient(c.name); setDropdownSearch(c.name); setShowClientDropdown(false); setPage(1); }}>
+                          onMouseDown={() => { setSearchClient(c.name); setDropdownSearch(c.name); setPage(1); }}>
                           <div className="fw-medium">{c.name}</div>
                         </button>
                       ))}
