@@ -214,6 +214,17 @@ export default function DailyArrivals() {
     }
   };
 
+  const handleUnknownClient = async () => {
+    let unknown = clients.find((c: any) => c.name === 'Unknown');
+    if (!unknown) {
+      unknown = await api.clients.create({ name: 'Unknown' });
+      setClients(prev => [...prev, unknown]);
+    }
+    setRowForm(prev => ({ ...prev, client_id: unknown.id }));
+    setClientSearch('Unknown');
+    setShowClientDropdown(false);
+  };
+
   const resetRowForm = () => {
     setRowForm({ client_id: '', caisse_details: [], weight: 0, price: 0, status: 'en demand' });
     setClientSearch('');
@@ -527,6 +538,9 @@ export default function DailyArrivals() {
                       {filteredClients.length === 0 && <div className="list-group-item text-muted small">No clients found</div>}
                     </div>
                   )}
+                  <button type="button" className="btn btn-sm btn-outline-warning mt-1" onClick={handleUnknownClient}>
+                    <i className="bi bi-person-dash me-1" />Unknown Client
+                  </button>
                 </div>
 
                 <div className="mb-3">
