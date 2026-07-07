@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 
-type Truck = any;
 type Arrival = any;
 type CaisseType = any;
 type Client = any;
@@ -18,9 +17,19 @@ interface ArrivalRow {
 
 const today = () => new Date().toISOString().split('T')[0];
 
+const fmtDate = (d: string) => {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const shiftDate = (d: string, days: number) => {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() + days);
+  return dt.toISOString().split('T')[0];
+};
+
 export default function DailyArrivals() {
   const [date, setDate] = useState(today());
-  const [trucks, setTrucks] = useState<Truck[]>([]);
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [caisseTypes, setCaisseTypes] = useState<CaisseType[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -48,14 +57,12 @@ export default function DailyArrivals() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [t, a, ct, c, p] = await Promise.all([
-        api.trucks.list(),
+      const [a, ct, c, p] = await Promise.all([
         api.arrivals.list(date),
         api.caisse.types(),
         api.clients.list(),
         api.products.list(),
       ]);
-      setTrucks(t);
       setArrivals(a);
       setCaisseTypes(ct);
       setClients(c);
@@ -89,6 +96,21 @@ export default function DailyArrivals() {
     return map;
   }, [arrivals]);
 
+  const truckInfo = useMemo(() => {
+    const map = new Map<string, { supplier_name: string; product_name: string; product_id: string; default_price: number }>();
+    for (const a of arrivals) {
+      if (a.truck_id && !map.has(a.truck_id)) {
+        map.set(a.truck_id, {
+          supplier_name: a.trucks?.supplier_name || 'Truck',
+          product_name: a.products?.name || '',
+          product_id: a.product_id,
+          default_price: a.price || 0,
+        });
+      }
+    }
+    return map;
+  }, [arrivals]);
+
   const calcNetWeight = (weight: number, caisseDetails: { caisse_type_id: string; count: number }[]) => {
     let tare = 0;
     for (const cd of caisseDetails) {
@@ -103,10 +125,20 @@ export default function DailyArrivals() {
   const handleAddTruck = async () => {
     if (!truckForm.supplier_name || !truckForm.product_id) return;
     try {
-      await api.trucks.create({
+      const truck = await api.trucks.create({
         supplier_name: truckForm.supplier_name,
         product_id: truckForm.product_id,
         default_price: truckForm.default_price,
+      });
+      await api.arrivals.create({
+        arrival_date: date,
+        truck_id: truck.id,
+        client_id: clients[0]?.id || '',
+        product_id: truckForm.product_id,
+        caisse_details: [],
+        weight: 0,
+        price: truckForm.default_price,
+        status: 'en demand',
       });
       setShowTruckModal(false);
       setTruckForm({ supplier_name: '', product_id: '', default_price: 0 });
@@ -119,17 +151,16 @@ export default function DailyArrivals() {
 
   const handleAddRow = async () => {
     if (!selectedTruckId || !rowForm.client_id) return;
-    const truck = trucks.find((t: any) => t.id === selectedTruckId);
-    if (!truck) return;
+    const info = truckInfo.get(selectedTruckId);
     try {
       await api.arrivals.create({
         arrival_date: date,
         truck_id: selectedTruckId,
         client_id: rowForm.client_id,
-        product_id: truck.product_id,
+        product_id: info?.product_id || '',
         caisse_details: rowForm.caisse_details,
         weight: rowForm.weight,
-        price: rowForm.price || truck.default_price,
+        price: rowForm.price || info?.default_price || 0,
         status: rowForm.status,
       });
       setShowRowModal(false);
@@ -218,9 +249,6 @@ export default function DailyArrivals() {
     }));
   };
 
-  const selectedClient = clients.find((c: any) => c.name.toLowerCase().startsWith(clientSearch.toLowerCase()));
-  const selectedProduct = products.find((p: any) => p.id === truckForm.product_id);
-
   const totalsForTruck = (truckArrivals: Arrival[]) => {
     let totalNetWeight = 0;
     let totalAmount = 0;
@@ -232,115 +260,160 @@ export default function DailyArrivals() {
     return { totalNetWeight, totalAmount };
   };
 
+  const grandTotals = useMemo(() => {
+    let totalNetWeight = 0;
+    let totalAmount = 0;
+    let totalEntries = 0;
+    for (const a of arrivals) {
+      const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
+      totalNetWeight += nw;
+      totalAmount += calcAmount(nw, a.price || 0);
+      totalEntries++;
+    }
+    return { totalNetWeight, totalAmount, totalEntries };
+  }, [arrivals, caisseTypes]);
+
+  const truckIds = Array.from(groupedByTruck.keys());
+  const isToday = date === today();
+
   return (
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <h4 className="mb-0"><i className="bi bi-truck me-2" />Daily Arrivals</h4>
         <div className="d-flex align-items-center gap-2">
+          <button className="btn btn-outline-secondary btn-sm" onClick={() => setDate(d => shiftDate(d, -1))} title="Previous day">
+            <i className="bi bi-chevron-left" />
+          </button>
           <input type="date" className="form-control form-control-sm" value={date}
             onChange={e => setDate(e.target.value)} style={{ width: 170 }} />
+          <button className="btn btn-outline-secondary btn-sm" onClick={() => setDate(d => shiftDate(d, 1))} title="Next day">
+            <i className="bi bi-chevron-right" />
+          </button>
+          {!isToday && (
+            <button className="btn btn-outline-primary btn-sm" onClick={() => setDate(today())}>
+              <i className="bi bi-calendar-event me-1" />Today
+            </button>
+          )}
           <button className="btn btn-primary btn-sm" onClick={() => { setShowTruckModal(true); setTruckForm({ supplier_name: '', product_id: '', default_price: 0 }); setProductSearch(''); }}>
             <i className="bi bi-plus-lg me-1" />Add Truck
           </button>
         </div>
       </div>
 
+      {!loading && arrivals.length > 0 && (
+        <div className="d-flex gap-3 mb-3 flex-wrap">
+          <div className="card border-0 shadow-sm px-3 py-2">
+            <small className="text-muted">Trucks</small>
+            <strong>{truckIds.length}</strong>
+          </div>
+          <div className="card border-0 shadow-sm px-3 py-2">
+            <small className="text-muted">Entries</small>
+            <strong>{grandTotals.totalEntries}</strong>
+          </div>
+          <div className="card border-0 shadow-sm px-3 py-2">
+            <small className="text-muted">Total Net Weight</small>
+            <strong>{grandTotals.totalNetWeight.toFixed(1)} kg</strong>
+          </div>
+          <div className="card border-0 shadow-sm px-3 py-2">
+            <small className="text-muted">Total Amount</small>
+            <strong>{grandTotals.totalAmount.toFixed(2)}</strong>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-5"><div className="spinner-border" /></div>
-      ) : trucks.length === 0 ? (
+      ) : truckIds.length === 0 ? (
         <div className="text-center text-muted py-5">
           <i className="bi bi-truck fs-1 d-block mb-2" />
-          <p>No trucks yet. Click "Add Truck" to start.</p>
+          <p>No trucks for {fmtDate(date)}. Click "Add Truck" to start.</p>
         </div>
       ) : (
-        trucks.map((truck: any) => {
-          const truckArrivals = groupedByTruck.get(truck.id) || [];
+        truckIds.map((truckId) => {
+          const truckArrivals = groupedByTruck.get(truckId)!;
+          const info = truckInfo.get(truckId);
           const { totalNetWeight, totalAmount } = totalsForTruck(truckArrivals);
           return (
-            <div key={truck.id} className="card border-0 shadow-sm mb-4">
+            <div key={truckId} className="card border-0 shadow-sm mb-4">
               <div className="card-header bg-white d-flex align-items-center justify-content-between">
                 <div>
-                  <strong>{truck.supplier_name}</strong>
-                  <span className="text-muted ms-2">— {truck.products?.name || ''}</span>
+                  <strong>{info?.supplier_name || 'Truck'}</strong>
+                  <span className="text-muted ms-2">— {info?.product_name || ''}</span>
                   <span className="badge bg-secondary ms-2">{truckArrivals.length} entries</span>
                 </div>
-                <button className="btn btn-outline-primary btn-sm" onClick={() => openAddRow(truck.id)}>
+                <button className="btn btn-outline-primary btn-sm" onClick={() => openAddRow(truckId)}>
                   <i className="bi bi-plus-lg me-1" />Add Entry
                 </button>
               </div>
               <div className="card-body p-0">
-                {truckArrivals.length === 0 ? (
-                  <div className="text-center text-muted py-3">No entries yet</div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover mb-0 align-middle">
-                      <thead className="table-light">
-                        <tr>
-                          <th>#</th>
-                          <th>Client</th>
-                          <th>Crate Types</th>
-                          <th className="text-end">Crates</th>
-                          <th className="text-end">Weight</th>
-                          <th className="text-end">Net Weight</th>
-                          <th className="text-end">Price</th>
-                          <th className="text-end">Amount</th>
-                          <th className="text-center">Status</th>
-                          <th className="text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {truckArrivals.map((a: any, idx: number) => {
-                          const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
-                          const amt = calcAmount(nw, a.price || 0);
-                          const totalCrates = (Array.isArray(a.caisse_details) ? a.caisse_details : []).reduce((s: number, cd: any) => s + (cd.count || 0), 0);
-                          return (
-                            <tr key={a.id}>
-                              <td className="text-muted">{idx + 1}</td>
-                              <td className="fw-semibold">{a.clients?.name || '-'}</td>
-                              <td>
-                                {(Array.isArray(a.caisse_details) ? a.caisse_details : []).map((cd: any) => {
-                                  const ct = caisseTypes.find((c: any) => c.id === cd.caisse_type_id);
-                                  return (
-                                    <span key={cd.caisse_type_id} className="badge bg-light text-dark me-1 mb-1">
-                                      {ct?.name || '?'} x{cd.count}
-                                    </span>
-                                  );
-                                })}
-                              </td>
-                              <td className="text-end">{totalCrates}</td>
-                              <td className="text-end">{Number(a.weight || 0).toFixed(1)} kg</td>
-                              <td className="text-end fw-bold">{nw.toFixed(1)} kg</td>
-                              <td className="text-end">{Number(a.price || 0).toFixed(2)}</td>
-                              <td className="text-end fw-bold">{amt.toFixed(2)}</td>
-                              <td className="text-center">
-                                <span className={`badge ${a.status === 'delivred' ? 'bg-success' : a.status === 'cancelled' ? 'bg-danger' : 'bg-warning text-dark'}`}>
-                                  {a.status}
-                                </span>
-                              </td>
-                              <td className="text-center">
-                                <button className="btn btn-sm btn-outline-primary me-1" onClick={() => openEditRow(a)} title="Edit">
-                                  <i className="bi bi-pencil" />
-                                </button>
-                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRow(a.id)} title="Delete">
-                                  <i className="bi bi-trash" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot className="table-light">
-                        <tr className="fw-bold">
-                          <td colSpan={5} className="text-end">Total</td>
-                          <td className="text-end">{totalNetWeight.toFixed(1)} kg</td>
-                          <td></td>
-                          <td className="text-end">{totalAmount.toFixed(2)}</td>
-                          <td colSpan={2}></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
+                <div className="table-responsive">
+                  <table className="table table-hover mb-0 align-middle">
+                    <thead className="table-light">
+                      <tr>
+                        <th>#</th>
+                        <th>Client</th>
+                        <th>Crate Types</th>
+                        <th className="text-end">Crates</th>
+                        <th className="text-end">Weight</th>
+                        <th className="text-end">Net Weight</th>
+                        <th className="text-end">Price</th>
+                        <th className="text-end">Amount</th>
+                        <th className="text-center">Status</th>
+                        <th className="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {truckArrivals.map((a: any, idx: number) => {
+                        const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
+                        const amt = calcAmount(nw, a.price || 0);
+                        const totalCrates = (Array.isArray(a.caisse_details) ? a.caisse_details : []).reduce((s: number, cd: any) => s + (cd.count || 0), 0);
+                        return (
+                          <tr key={a.id}>
+                            <td className="text-muted">{idx + 1}</td>
+                            <td className="fw-semibold">{a.clients?.name || '-'}</td>
+                            <td>
+                              {(Array.isArray(a.caisse_details) ? a.caisse_details : []).map((cd: any) => {
+                                const ct = caisseTypes.find((c: any) => c.id === cd.caisse_type_id);
+                                return (
+                                  <span key={cd.caisse_type_id} className="badge bg-light text-dark me-1 mb-1">
+                                    {ct?.name || '?'} x{cd.count}
+                                  </span>
+                                );
+                              })}
+                            </td>
+                            <td className="text-end">{totalCrates}</td>
+                            <td className="text-end">{Number(a.weight || 0).toFixed(1)} kg</td>
+                            <td className="text-end fw-bold">{nw.toFixed(1)} kg</td>
+                            <td className="text-end">{Number(a.price || 0).toFixed(2)}</td>
+                            <td className="text-end fw-bold">{amt.toFixed(2)}</td>
+                            <td className="text-center">
+                              <span className={`badge ${a.status === 'delivred' ? 'bg-success' : a.status === 'cancelled' ? 'bg-danger' : 'bg-warning text-dark'}`}>
+                                {a.status}
+                              </span>
+                            </td>
+                            <td className="text-center">
+                              <button className="btn btn-sm btn-outline-primary me-1" onClick={() => openEditRow(a)} title="Edit">
+                                <i className="bi bi-pencil" />
+                              </button>
+                              <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRow(a.id)} title="Delete">
+                                <i className="bi bi-trash" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="table-light">
+                      <tr className="fw-bold">
+                        <td colSpan={5} className="text-end">Total</td>
+                        <td className="text-end">{totalNetWeight.toFixed(1)} kg</td>
+                        <td></td>
+                        <td className="text-end">{totalAmount.toFixed(2)}</td>
+                        <td colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -352,7 +425,7 @@ export default function DailyArrivals() {
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Add Truck</h5>
+                <h5 className="modal-title">Add Truck — {fmtDate(date)}</h5>
                 <button className="btn-close" onClick={() => setShowTruckModal(false)} />
               </div>
               <div className="modal-body">
@@ -360,7 +433,7 @@ export default function DailyArrivals() {
                   <label className="form-label">Supplier / Truck Name</label>
                   <input type="text" className="form-control" value={truckForm.supplier_name}
                     onChange={e => setTruckForm({ ...truckForm, supplier_name: e.target.value })}
-                    placeholder="e.g. Mohamed Truck" />
+                    placeholder="e.g. Mohamed Truck" autoFocus />
                 </div>
                 <div className="mb-3 position-relative">
                   <label className="form-label">Product</label>
