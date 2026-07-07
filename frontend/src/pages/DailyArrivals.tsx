@@ -38,6 +38,7 @@ export default function DailyArrivals() {
 
   const [showTruckModal, setShowTruckModal] = useState(false);
   const [truckProductName, setTruckProductName] = useState('');
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
 
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null);
   const [editTruckName, setEditTruckName] = useState('');
@@ -57,6 +58,7 @@ export default function DailyArrivals() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setSelectedTab(null);
     try {
       const [t, a, ct, c] = await Promise.all([
         api.trucks.list(),
@@ -102,6 +104,12 @@ export default function DailyArrivals() {
       })
       .map(t => t.id);
   }, [trucks, arrivals, date]);
+
+  useEffect(() => {
+    if (activeTruckIds.length > 0 && (!selectedTab || !activeTruckIds.includes(selectedTab))) {
+      setSelectedTab(activeTruckIds[0]);
+    }
+  }, [activeTruckIds, selectedTab]);
 
   const calcNetWeight = (weight: number, caisseDetails: { caisse_type_id: string; count: number }[]) => {
     let tare = 0;
@@ -352,106 +360,125 @@ export default function DailyArrivals() {
           <p>No trucks for {fmtDate(date)}. Click "Add Truck" to start.</p>
         </div>
       ) : (
-        activeTruckIds.map((truckId) => {
-          const truckArrivals = groupedByTruck.get(truckId) || [];
-          const truck = trucks.find((t: any) => t.id === truckId);
-          const { totalNetWeight, totalAmount } = totalsForTruck(truckArrivals);
-          return (
-            <div key={truckId} className="card border-0 shadow-sm mb-4">
-              <div className="card-header bg-white d-flex align-items-center justify-content-between">
-                <div className="d-flex align-items-center gap-2">
-                  <strong>{truck?.products?.name || truck?.supplier_name || 'Truck'}</strong>
-                  <span className="badge bg-secondary">{truckArrivals.length} entries</span>
-                  <button className="btn btn-sm btn-outline-secondary" title="Edit product name"
-                    onClick={() => { setEditingTruck(truck); setEditTruckName(truck?.products?.name || truck?.supplier_name || ''); }}>
-                    <i className="bi bi-pencil" />
+        <>
+          <ul className="nav nav-tabs mb-0">
+            {activeTruckIds.map((truckId) => {
+              const truck = trucks.find((t: any) => t.id === truckId);
+              const count = (groupedByTruck.get(truckId) || []).length;
+              return (
+                <li key={truckId} className="nav-item">
+                  <button
+                    className={`nav-link ${selectedTab === truckId ? 'active' : ''}`}
+                    onClick={() => setSelectedTab(truckId)}>
+                    <i className="bi bi-truck me-1" />
+                    {truck?.products?.name || truck?.supplier_name || 'Truck'}
+                    {count > 0 && <span className="badge bg-secondary ms-1">{count}</span>}
                   </button>
-                  <button className="btn btn-sm btn-outline-danger" title="Delete truck"
-                    onClick={() => handleDeleteTruck(truckId)}>
-                    <i className="bi bi-trash" />
+                </li>
+              );
+            })}
+          </ul>
+
+          {selectedTab && activeTruckIds.includes(selectedTab) && (() => {
+            const truckArrivals = groupedByTruck.get(selectedTab) || [];
+            const truck = trucks.find((t: any) => t.id === selectedTab);
+            const { totalNetWeight, totalAmount } = totalsForTruck(truckArrivals);
+            return (
+              <div className="card border-0 shadow-sm rounded-0 rounded-bottom">
+                <div className="card-header bg-white d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center gap-2">
+                    <strong>{truck?.products?.name || truck?.supplier_name || 'Truck'}</strong>
+                    <button className="btn btn-sm btn-outline-secondary" title="Edit product name"
+                      onClick={() => { setEditingTruck(truck); setEditTruckName(truck?.products?.name || truck?.supplier_name || ''); }}>
+                      <i className="bi bi-pencil" />
+                    </button>
+                    <button className="btn btn-sm btn-outline-danger" title="Delete truck"
+                      onClick={() => handleDeleteTruck(selectedTab)}>
+                      <i className="bi bi-trash" />
+                    </button>
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={() => openAddRow(selectedTab)}>
+                    <i className="bi bi-plus-lg me-1" />Add Entry
                   </button>
                 </div>
-                <button className="btn btn-outline-primary btn-sm" onClick={() => openAddRow(truckId)}>
-                  <i className="bi bi-plus-lg me-1" />Add Entry
-                </button>
+                <div className="card-body p-0">
+                  {truckArrivals.length === 0 ? (
+                    <div className="text-center text-muted py-4">No entries yet. Click "Add Entry".</div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-hover mb-0 align-middle">
+                        <thead className="table-light">
+                          <tr>
+                            <th>#</th>
+                            <th>Client</th>
+                            <th>Crate Types</th>
+                            <th className="text-end">Crates</th>
+                            <th className="text-end">Weight</th>
+                            <th className="text-end">Net Weight</th>
+                            <th className="text-end">Price</th>
+                            <th className="text-end">Amount</th>
+                            <th className="text-center">Status</th>
+                            <th className="text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {truckArrivals.map((a: any, idx: number) => {
+                            const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
+                            const amt = calcAmount(nw, a.price || 0);
+                            const totalCrates = (Array.isArray(a.caisse_details) ? a.caisse_details : []).reduce((s: number, cd: any) => s + (cd.count || 0), 0);
+                            return (
+                              <tr key={a.id}>
+                                <td className="text-muted">{idx + 1}</td>
+                                <td className="fw-semibold">{a.clients?.name || '-'}</td>
+                                <td>
+                                  {(Array.isArray(a.caisse_details) ? a.caisse_details : []).map((cd: any) => {
+                                    const ct = caisseTypes.find((c: any) => c.id === cd.caisse_type_id);
+                                    return (
+                                      <span key={cd.caisse_type_id} className="badge bg-light text-dark me-1 mb-1">
+                                        {ct?.name || '?'} x{cd.count}
+                                      </span>
+                                    );
+                                  })}
+                                </td>
+                                <td className="text-end">{totalCrates}</td>
+                                <td className="text-end">{Number(a.weight || 0).toFixed(1)} kg</td>
+                                <td className="text-end fw-bold">{nw.toFixed(1)} kg</td>
+                                <td className="text-end">{Number(a.price || 0).toFixed(2)}</td>
+                                <td className="text-end fw-bold">{amt.toFixed(2)}</td>
+                                <td className="text-center">
+                                  <span className={`badge ${a.status === 'delivred' ? 'bg-success' : a.status === 'cancelled' ? 'bg-danger' : 'bg-warning text-dark'}`}>
+                                    {a.status}
+                                  </span>
+                                </td>
+                                <td className="text-center">
+                                  <button className="btn btn-sm btn-outline-primary me-1" onClick={() => openEditRow(a)} title="Edit">
+                                    <i className="bi bi-pencil" />
+                                  </button>
+                                  <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRow(a.id)} title="Delete">
+                                    <i className="bi bi-trash" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="table-light">
+                          <tr className="fw-bold">
+                            <td colSpan={5} className="text-end">Total</td>
+                            <td className="text-end">{totalNetWeight.toFixed(1)} kg</td>
+                            <td></td>
+                            <td className="text-end">{totalAmount.toFixed(2)}</td>
+                            <td colSpan={2}></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="card-body p-0">
-                {truckArrivals.length === 0 ? (
-                  <div className="text-center text-muted py-3">No entries yet. Click "Add Entry".</div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover mb-0 align-middle">
-                      <thead className="table-light">
-                        <tr>
-                          <th>#</th>
-                          <th>Client</th>
-                          <th>Crate Types</th>
-                          <th className="text-end">Crates</th>
-                          <th className="text-end">Weight</th>
-                          <th className="text-end">Net Weight</th>
-                          <th className="text-end">Price</th>
-                          <th className="text-end">Amount</th>
-                          <th className="text-center">Status</th>
-                          <th className="text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {truckArrivals.map((a: any, idx: number) => {
-                          const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
-                          const amt = calcAmount(nw, a.price || 0);
-                          const totalCrates = (Array.isArray(a.caisse_details) ? a.caisse_details : []).reduce((s: number, cd: any) => s + (cd.count || 0), 0);
-                          return (
-                            <tr key={a.id}>
-                              <td className="text-muted">{idx + 1}</td>
-                              <td className="fw-semibold">{a.clients?.name || '-'}</td>
-                              <td>
-                                {(Array.isArray(a.caisse_details) ? a.caisse_details : []).map((cd: any) => {
-                                  const ct = caisseTypes.find((c: any) => c.id === cd.caisse_type_id);
-                                  return (
-                                    <span key={cd.caisse_type_id} className="badge bg-light text-dark me-1 mb-1">
-                                      {ct?.name || '?'} x{cd.count}
-                                    </span>
-                                  );
-                                })}
-                              </td>
-                              <td className="text-end">{totalCrates}</td>
-                              <td className="text-end">{Number(a.weight || 0).toFixed(1)} kg</td>
-                              <td className="text-end fw-bold">{nw.toFixed(1)} kg</td>
-                              <td className="text-end">{Number(a.price || 0).toFixed(2)}</td>
-                              <td className="text-end fw-bold">{amt.toFixed(2)}</td>
-                              <td className="text-center">
-                                <span className={`badge ${a.status === 'delivred' ? 'bg-success' : a.status === 'cancelled' ? 'bg-danger' : 'bg-warning text-dark'}`}>
-                                  {a.status}
-                                </span>
-                              </td>
-                              <td className="text-center">
-                                <button className="btn btn-sm btn-outline-primary me-1" onClick={() => openEditRow(a)} title="Edit">
-                                  <i className="bi bi-pencil" />
-                                </button>
-                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRow(a.id)} title="Delete">
-                                  <i className="bi bi-trash" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot className="table-light">
-                        <tr className="fw-bold">
-                          <td colSpan={5} className="text-end">Total</td>
-                          <td className="text-end">{totalNetWeight.toFixed(1)} kg</td>
-                          <td></td>
-                          <td className="text-end">{totalAmount.toFixed(2)}</td>
-                          <td colSpan={2}></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })
+            );
+          })()}
+        </>
       )}
 
       {showTruckModal && (
