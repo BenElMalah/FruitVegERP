@@ -1,4 +1,4 @@
-const API_URL = '/api';
+const API_URL = 'https://fruitvegerp-production.up.railway.app/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
