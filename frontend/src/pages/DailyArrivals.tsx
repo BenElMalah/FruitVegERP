@@ -94,8 +94,14 @@ export default function DailyArrivals() {
 
   const activeTruckIds = useMemo(() => {
     const idsFromArrivals = new Set(arrivals.map(a => a.truck_id).filter(Boolean));
-    return trucks.filter(t => idsFromArrivals.has(t.id)).map(t => t.id);
-  }, [trucks, arrivals]);
+    return trucks
+      .filter(t => {
+        if (idsFromArrivals.has(t.id)) return true;
+        const created = t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '';
+        return created === date;
+      })
+      .map(t => t.id);
+  }, [trucks, arrivals, date]);
 
   const calcNetWeight = (weight: number, caisseDetails: { caisse_type_id: string; count: number }[]) => {
     let tare = 0;
