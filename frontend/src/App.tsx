@@ -5,8 +5,6 @@ import { Layout } from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
-import InvoicesPage from './pages/InvoicesPage';
-import PaymentsPage from './pages/PaymentsPage';
 import CaissePage from './pages/CaissePage';
 import UsersPage from './pages/UsersPage';
 import DailyArrivals from './pages/DailyArrivals';
@@ -25,8 +23,6 @@ export default function App() {
             <Route element={<Layout />}>
               <Route index element={<DashboardPage />} />
               <Route path="clients" element={<ClientsPage />} />
-              <Route path="invoices" element={<InvoicesPage />} />
-              <Route path="payments" element={<PaymentsPage />} />
               <Route path="caisse" element={<CaissePage />} />
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="users" element={<ProtectedRoute roles={['boss', 'manager']}><UsersPage /></ProtectedRoute>} />

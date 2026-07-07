@@ -10,8 +10,6 @@ type NavItem = { path: string; labelKey: string; icon: string };
 const navByRole: Record<string, NavItem[]> = {
   collector: [
     { path: '/clients', labelKey: 'Clients', icon: 'bi-people' },
-    { path: '/invoices', labelKey: 'Invoices', icon: 'bi-receipt' },
-    { path: '/payments', labelKey: 'Collect Payments', icon: 'bi-cash-coin' },
     { path: '/caisse', labelKey: 'Caisses', icon: 'bi-box-seam' },
     { path: '/alerts', labelKey: 'Alerts', icon: 'bi-bell' },
   ],
@@ -19,8 +17,6 @@ const navByRole: Record<string, NavItem[]> = {
     { path: '/', labelKey: 'Dashboard', icon: 'bi-grid' },
     { path: '/clients', labelKey: 'Clients', icon: 'bi-people' },
     { path: '/users', labelKey: 'Members', icon: 'bi-person-badge' },
-    { path: '/invoices', labelKey: 'Invoices', icon: 'bi-receipt' },
-    { path: '/payments', labelKey: 'Payments', icon: 'bi-cash-coin' },
     { path: '/caisse', labelKey: 'Caisses', icon: 'bi-box-seam' },
     { path: '/arrivals', labelKey: 'Daily Arrivals', icon: 'bi-truck' },
     { path: '/stock', labelKey: 'Stock', icon: 'bi-boxes' },
@@ -30,8 +26,6 @@ const navByRole: Record<string, NavItem[]> = {
     { path: '/', labelKey: 'Dashboard', icon: 'bi-grid' },
     { path: '/users', labelKey: 'Members', icon: 'bi-person-badge' },
     { path: '/clients', labelKey: 'Clients', icon: 'bi-people' },
-    { path: '/invoices', labelKey: 'Invoices', icon: 'bi-receipt' },
-    { path: '/payments', labelKey: 'Payments', icon: 'bi-cash-coin' },
     { path: '/caisse', labelKey: 'Caisses', icon: 'bi-box-seam' },
     { path: '/arrivals', labelKey: 'Daily Arrivals', icon: 'bi-truck' },
     { path: '/stock', labelKey: 'Stock', icon: 'bi-boxes' },
