@@ -37,9 +37,7 @@ export default function DailyArrivals() {
   const [loading, setLoading] = useState(true);
 
   const [showTruckModal, setShowTruckModal] = useState(false);
-  const [truckForm, setTruckForm] = useState({ supplier_name: '', product_id: '', default_price: 0 });
-  const [productSearch, setProductSearch] = useState('');
-  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [truckProductName, setTruckProductName] = useState('');
 
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [showRowModal, setShowRowModal] = useState(false);
@@ -75,11 +73,6 @@ export default function DailyArrivals() {
   }, [date]);
 
   useEffect(() => { load(); }, [load]);
-
-  const filteredProducts = useMemo(() => {
-    if (!productSearch) return products;
-    return products.filter((p: any) => p.name.toLowerCase().startsWith(productSearch.toLowerCase()));
-  }, [products, productSearch]);
 
   const filteredClients = useMemo(() => {
     if (!clientSearch) return clients;
@@ -123,26 +116,25 @@ export default function DailyArrivals() {
   const calcAmount = (netWeight: number, price: number) => netWeight * price;
 
   const handleAddTruck = async () => {
-    if (!truckForm.supplier_name || !truckForm.product_id) return;
+    if (!truckProductName.trim()) return;
     try {
       const truck = await api.trucks.create({
-        supplier_name: truckForm.supplier_name,
-        product_id: truckForm.product_id,
-        default_price: truckForm.default_price,
+        supplier_name: truckProductName.trim(),
+        product_name: truckProductName.trim(),
+        default_price: 0,
       });
       await api.arrivals.create({
         arrival_date: date,
         truck_id: truck.id,
         client_id: clients[0]?.id || '',
-        product_id: truckForm.product_id,
+        product_id: truck.product_id,
         caisse_details: [],
         weight: 0,
-        price: truckForm.default_price,
+        price: 0,
         status: 'en demand',
       });
       setShowTruckModal(false);
-      setTruckForm({ supplier_name: '', product_id: '', default_price: 0 });
-      setProductSearch('');
+      setTruckProductName('');
       load();
     } catch (e: any) {
       alert(e.message);
@@ -294,7 +286,7 @@ export default function DailyArrivals() {
               <i className="bi bi-calendar-event me-1" />Today
             </button>
           )}
-          <button className="btn btn-primary btn-sm" onClick={() => { setShowTruckModal(true); setTruckForm({ supplier_name: '', product_id: '', default_price: 0 }); setProductSearch(''); }}>
+          <button className="btn btn-primary btn-sm" onClick={() => { setShowTruckModal(true); setTruckProductName(''); }}>
             <i className="bi bi-plus-lg me-1" />Add Truck
           </button>
         </div>
@@ -430,46 +422,17 @@ export default function DailyArrivals() {
               </div>
               <div className="modal-body">
                 <div className="mb-3">
-                  <label className="form-label">Supplier / Truck Name</label>
-                  <input type="text" className="form-control" value={truckForm.supplier_name}
-                    onChange={e => setTruckForm({ ...truckForm, supplier_name: e.target.value })}
-                    placeholder="e.g. Mohamed Truck" autoFocus />
-                </div>
-                <div className="mb-3 position-relative">
-                  <label className="form-label">Product</label>
-                  <input type="text" className="form-control" value={productSearch}
-                    placeholder="Search product..."
-                    onChange={e => { setProductSearch(e.target.value); setShowProductDropdown(true); setTruckForm({ ...truckForm, product_id: '' }); }}
-                    onFocus={() => setShowProductDropdown(true)} />
-                  {showProductDropdown && productSearch && (
-                    <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 180, overflow: 'auto' }}>
-                      {filteredProducts.map((p: any) => (
-                        <button key={p.id} type="button" className="list-group-item list-group-item-action py-1"
-                          onMouseDown={() => {
-                            setTruckForm({ ...truckForm, product_id: p.id, default_price: p.price || 0 });
-                            setProductSearch(p.name);
-                            setShowProductDropdown(false);
-                          }}>
-                          <div className="fw-medium">{p.name}</div>
-                          <small className="text-muted">{p.unit} — {Number(p.price).toFixed(2)}/kg</small>
-                        </button>
-                      ))}
-                      {filteredProducts.length === 0 && (
-                        <div className="list-group-item text-muted small">No products found</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Default Price (optional)</label>
-                  <input type="number" className="form-control" step="0.01" value={truckForm.default_price}
-                    onChange={e => setTruckForm({ ...truckForm, default_price: Number(e.target.value) })} />
+                  <label className="form-label">Product Name</label>
+                  <input type="text" className="form-control" value={truckProductName}
+                    onChange={e => setTruckProductName(e.target.value)}
+                    placeholder="e.g. Tomatoes" autoFocus
+                    onKeyDown={e => e.key === 'Enter' && handleAddTruck()} />
                 </div>
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setShowTruckModal(false)}>Cancel</button>
                 <button className="btn btn-primary" onClick={handleAddTruck}
-                  disabled={!truckForm.supplier_name || !truckForm.product_id}>Add Truck</button>
+                  disabled={!truckProductName.trim()}>Add Truck</button>
               </div>
             </div>
           </div>
