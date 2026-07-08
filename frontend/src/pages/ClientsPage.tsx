@@ -371,8 +371,7 @@ export default function ClientsPage() {
                 <th>{t('Name')}</th>
                 <th>{t('Phone')}</th>
                 <th>{t('Address')}</th>
-                <th className="text-end">{t('Caisses')}</th>
-                {showMissingColumn && <th className="text-end">{t('Missing')}</th>}
+                <th className="text-end">{t('Missing')}</th>
                 {showDueColumn && <th className="text-end">{t('Due')}</th>}
                 <th style={{ width: 100 }}>{t('Actions')}</th>
               </tr>
@@ -384,7 +383,6 @@ export default function ClientsPage() {
                   <td><button className="btn btn-link p-0 text-primary fw-semibold text-decoration-none" onClick={() => openViewClient(c)}>{c.name}</button></td>
                   <td>{c.phone || <span className="text-muted">-</span>}</td>
                   <td><small>{c.address || '-'}</small></td>
-                  <td className="text-end"><span className="badge bg-info bg-opacity-25 text-info-emphasis">{c.total_caisses || 0}</span></td>
                   {showMissingColumn && (
                     <td className="text-end">
                       {(() => {
@@ -430,7 +428,7 @@ export default function ClientsPage() {
               ))}
               {!paginatedClients.length && (
                 <tr>
-                  <td colSpan={showDueColumn && showMissingColumn ? 8 : showDueColumn || showMissingColumn ? 7 : 6} className="text-center text-muted py-5">
+                  <td colSpan={showDueColumn ? 7 : 6} className="text-center text-muted py-5">
                     <i className="bi bi-inbox display-6 d-block mb-2 opacity-50" />
                     No clients found
                   </td>
@@ -531,11 +529,6 @@ export default function ClientsPage() {
                     </button>
                   </li>
                   <li className="nav-item">
-                    <button className={`nav-link ${viewTab === 'payments' ? 'active' : ''}`} onClick={() => setViewTab('payments')}>
-                      {t('Payments')} <span className="badge bg-success ms-1">{viewPayments.length}</span>
-                    </button>
-                  </li>
-                  <li className="nav-item">
                     <button className={`nav-link ${viewTab === 'caisses' ? 'active' : ''}`} onClick={() => setViewTab('caisses')}>
                       {t('Caisse Balance')}
                     </button>
@@ -547,19 +540,20 @@ export default function ClientsPage() {
                 {!viewLoading && viewTab === 'invoices' && (
                   <div className="table-responsive">
                   <table className="table table-sm table-hover">
-                    <thead><tr><th>#</th><th>{t('Total')}</th><th>{t('Paid')}</th><th>{t('Remaining')}</th><th>{t('Status')}</th><th>{t('Date')}</th></tr></thead>
+                    <thead><tr><th>{t('Invoice #')}</th><th className="text-end">{t('Total')}</th><th className="text-end">{t('Paid')}</th><th className="text-end">{t('Remaining')}</th><th>{t('Status')}</th><th>{t('Due Date')}</th><th>{t('Created')}</th></tr></thead>
                     <tbody>
                       {viewInvoices.map(inv => (
                         <tr key={inv.id}>
-                          <td>{inv.invoice_number}</td>
-                          <td>{inv.total?.toFixed(2)}</td>
-                          <td>{inv.paid_amount?.toFixed(2)}</td>
-                          <td className={inv.remaining_amount > 0 ? 'text-danger' : ''}>{inv.remaining_amount?.toFixed(2)}</td>
-                          <td><span className={`badge ${inv.status === 'paid' ? 'bg-success' : inv.status === 'partial' ? 'bg-warning' : 'bg-danger'}`}>{t(inv.status)}</span></td>
-                          <td><small>{new Date(inv.created_at).toLocaleDateString()}</small></td>
+                          <td className="fw-semibold">{inv.invoice_number}</td>
+                          <td className="text-end">{Number(inv.total || 0).toFixed(2)}</td>
+                          <td className="text-end text-success">{Number(inv.paid_amount || 0).toFixed(2)}</td>
+                          <td className={`text-end fw-bold ${(inv.remaining_amount || 0) > 0 ? 'text-danger' : 'text-success'}`}>{Number(inv.remaining_amount || 0).toFixed(2)}</td>
+                          <td><span className={`badge ${inv.status === 'paid' ? 'bg-success' : inv.status === 'partial' ? 'bg-warning text-dark' : inv.status === 'overdue' ? 'bg-danger' : 'bg-secondary'}`}>{t(inv.status)}</span></td>
+                          <td><small>{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '-'}</small></td>
+                          <td><small className="text-muted">{new Date(inv.created_at).toLocaleDateString()}</small></td>
                         </tr>
                       ))}
-                      {!viewInvoices.length && <tr><td colSpan={6} className="text-center text-muted">{t('No invoices')}</td></tr>}
+                      {!viewInvoices.length && <tr><td colSpan={7} className="text-center text-muted">{t('No invoices')}</td></tr>}
                     </tbody>
                   </table>
                   </div>

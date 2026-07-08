@@ -9,6 +9,14 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  weekAgo.setHours(0, 0, 0, 0);
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
   const [
     { data: todayInvoices },
     { data: unpaidInvoices },
@@ -19,6 +27,7 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
     { count: unreadNotifications },
     { data: yesterdayDeliveries },
     { data: todayArrivals },
+    { data: allMovements },
   ] = await Promise.all([
     supabaseAdmin.from('invoices').select('total').gte('created_at', today.toISOString()),
     supabaseAdmin.from('invoices').select('id, total, remaining_amount, clients(name)').in('status', ['unpaid', 'partial', 'overdue']),
@@ -34,6 +43,8 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
       return supabaseAdmin.from('daily_arrivals').select('weight, quantity').eq('arrival_date', yDate).eq('status', 'delivred');
     })(),
     supabaseAdmin.from('daily_arrivals').select('weight, quantity, net_weight, status').eq('arrival_date', today.toISOString().split('T')[0]),
+    supabaseAdmin.from('caisse_movements').select('client_id, id, quantity, movement_type, created_at')
+      .gte('created_at', monthStart.toISOString()),
   ]);
 
   const todaySales = (todayInvoices || []).reduce((sum, inv) => sum + Number(inv.total), 0);
@@ -53,6 +64,40 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
         deficit: yesterdayTotalWeight - todayTotalWeight,
       }
     : null;
+
+  const movements = allMovements || [];
+
+  const firstReturnPerClient = new Map<string, string>();
+  movements
+    .filter((m: any) => m.movement_type === 'return')
+    .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .forEach((m: any) => {
+      if (!firstReturnPerClient.has(m.client_id)) {
+        firstReturnPerClient.set(m.client_id, m.id);
+      }
+    });
+
+  const isExcluded = (m: any) => m.movement_type === 'return' && firstReturnPerClient.get(m.client_id) === m.id;
+
+  const todayStr = today.toISOString().split('T')[0];
+  const weekStr = weekAgo.toISOString();
+
+  const calcStats = (fromDate: string) => {
+    const filtered = movements.filter((m: any) => m.created_at >= fromDate);
+    let out = 0, returned = 0;
+    filtered.forEach((m: any) => {
+      if (isExcluded(m)) return;
+      if (m.movement_type === 'out') out += m.quantity;
+      else if (m.movement_type === 'return') returned += m.quantity;
+    });
+    return { out, returned, missing: out - returned };
+  };
+
+  const caisseStats = {
+    today: calcStats(todayStr),
+    week: calcStats(weekStr),
+    month: calcStats(monthStart.toISOString()),
+  };
 
   res.json({
     today_sales: todaySales,
@@ -79,6 +124,7 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
     })),
     unread_notifications: unreadNotifications || 0,
     stock_alert: stockAlert,
+    caisse_stats: caisseStats,
   });
 });
 

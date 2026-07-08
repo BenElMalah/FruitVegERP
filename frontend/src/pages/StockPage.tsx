@@ -10,7 +10,6 @@ export default function StockPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<StockItem[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [trucks, setTrucks] = useState<any[]>([]);
   const [selectedWh, setSelectedWh] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAdjModal, setShowAdjModal] = useState(false);
@@ -18,7 +17,6 @@ export default function StockPage() {
   const [formProduct, setFormProduct] = useState('');
   const [formQty, setFormQty] = useState('');
   const [formWh, setFormWh] = useState('');
-  const [formTruck, setFormTruck] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [qtyInputs, setQtyInputs] = useState<Record<string, string>>({});
@@ -43,7 +41,6 @@ export default function StockPage() {
     api.stock.list(selectedWh || undefined).then(setItems).catch(() => {});
     api.products.list().then(setProducts).catch(() => {});
     api.warehouses.list().then(setWarehouses).catch(() => {});
-    api.trucks.list().then(setTrucks).catch(() => {});
   };
   useEffect(() => { load(); }, [selectedWh]);
 
@@ -51,7 +48,6 @@ export default function StockPage() {
     setFormProduct('');
     setFormQty('');
     setFormWh(selectedWh);
-    setFormTruck('');
     setShowAddModal(true);
   };
 
@@ -60,14 +56,18 @@ export default function StockPage() {
     setFormProduct(item.product_id);
     setFormQty('');
     setFormWh(item.warehouse_id || '');
-    setFormTruck(item.truck_id || '');
     setShowAdjModal(true);
   };
 
   const saveAdd = async () => {
     if (!formProduct || !formQty || Number(formQty) <= 0) return;
     try {
-      await api.stock.adjust({ product_id: formProduct, quantity: Number(formQty), warehouse_id: formWh || undefined, truck_id: formTruck || undefined });
+      let productId = products.find((p: any) => p.name.toLowerCase() === formProduct.toLowerCase())?.id;
+      if (!productId) {
+        const newProduct = await api.products.create({ name: formProduct.trim(), unit: 'kg', price: 0 });
+        productId = newProduct.id;
+      }
+      await api.stock.adjust({ product_id: productId, quantity: Number(formQty), warehouse_id: formWh || undefined });
       showToast('Stock added', 'success');
       setShowAddModal(false);
       load();
@@ -79,7 +79,7 @@ export default function StockPage() {
   const saveAdj = async () => {
     if (!adjItem || !formQty) return;
     try {
-      await api.stock.adjust({ product_id: adjItem.product_id, quantity: Number(formQty), warehouse_id: formWh || undefined, truck_id: formTruck || undefined });
+      await api.stock.adjust({ product_id: adjItem.product_id, quantity: Number(formQty), warehouse_id: formWh || undefined });
       showToast('Stock adjusted', 'success');
       setShowAdjModal(false);
       setAdjItem(null);
@@ -93,7 +93,7 @@ export default function StockPage() {
     const qty = Number(qtyInputs[item.id]);
     if (isNaN(qty) || qty < 0) return;
     try {
-      await api.stock.update(item.id, qty, item.truck_id);
+      await api.stock.update(item.id, qty);
       showToast('Quantity set', 'success');
       load();
     } catch (err: any) {
@@ -103,7 +103,7 @@ export default function StockPage() {
 
   const adjustQty = async (item: StockItem, delta: number) => {
     try {
-      await api.stock.adjust({ product_id: item.product_id, quantity: delta, warehouse_id: item.warehouse_id || undefined, truck_id: item.truck_id || undefined });
+      await api.stock.adjust({ product_id: item.product_id, quantity: delta, warehouse_id: item.warehouse_id || undefined });
       showToast(`${delta > 0 ? '+' : ''}${delta}`, 'success');
       load();
     } catch (err: any) {
@@ -164,7 +164,6 @@ export default function StockPage() {
               <tr>
                 <th>Product</th>
                 <th>Warehouse</th>
-                <th>Truck</th>
                 <th className="text-end" style={{ width: 120 }}>Caisses</th>
                 <th className="text-center" style={{ width: 260 }}>Quick Adjust</th>
                 <th className="text-end" style={{ width: 60 }} />
@@ -175,19 +174,6 @@ export default function StockPage() {
                 <tr key={item.id}>
                   <td className="fw-semibold">{item.products?.name || item.product_name || item.product_id}</td>
                   <td><span className="badge bg-info bg-opacity-25 text-info-emphasis">{item.warehouses?.name || 'Main'}</span></td>
-                  <td>
-                    {item.trucks?.supplier_name ? (
-                      <span className="badge bg-warning bg-opacity-25 text-warning-emphasis">
-                        {item.trucks.supplier_name} ({item.products?.name || item.product_name}
-                        {item.trucks.created_at ? ' ' + new Date(item.trucks.created_at).toLocaleDateString('en-GB') : ''})
-                      </span>
-                    ) : (
-                      <span className="text-muted small">
-                        {item.products?.name || item.product_name}
-                        {item.updated_at ? ' (' + new Date(item.updated_at).toLocaleDateString('en-GB') + ')' : ''}
-                      </span>
-                    )}
-                  </td>
                   <td className="text-end">
                     <span className={`fw-bold fs-5 ${Number(item.quantity) <= 0 ? 'text-danger' : 'text-success'}`}>
                       {Number(item.quantity)}
@@ -214,7 +200,7 @@ export default function StockPage() {
                 </tr>
               ))}
               {!items.length && (
-                <tr><td colSpan={6} className="text-center text-muted py-4">No stock items found</td></tr>
+                <tr><td colSpan={5} className="text-center text-muted py-4">No stock items found</td></tr>
               )}
             </tbody>
           </table>
@@ -223,7 +209,7 @@ export default function StockPage() {
         </div>
       </div>
 
-      {/* Add Stock Modal - positive only */}
+      {/* Add Stock Modal */}
       {showAddModal && (
         <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog">
@@ -234,13 +220,18 @@ export default function StockPage() {
               </div>
               <div className="modal-body">
                 <div className="mb-3">
-                  <label className="form-label">Product</label>
-                  <select className="form-select" value={formProduct} onChange={e => setFormProduct(e.target.value)}>
-                    <option value="">-- Select product --</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
-                    ))}
-                  </select>
+                  <label className="form-label">Product Name</label>
+                  <input type="text" className="form-control" value={formProduct}
+                    onChange={e => setFormProduct(e.target.value)} placeholder="e.g. Tomatoes" autoFocus
+                    list="product-suggestions" />
+                  <datalist id="product-suggestions">
+                    {products.map(p => <option key={p.id} value={p.name} />)}
+                  </datalist>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Number of Caisses</label>
+                  <input type="number" step="1" min="1" className="form-control" value={formQty}
+                    onChange={e => setFormQty(e.target.value)} placeholder="e.g. 50" />
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Warehouse</label>
@@ -248,20 +239,6 @@ export default function StockPage() {
                     <option value="">Main Warehouse</option>
                     {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Truck</label>
-                  <select className="form-select" value={formTruck} onChange={e => setFormTruck(e.target.value)}>
-                    <option value="">-- Select truck (optional) --</option>
-                    {trucks.map(t => (
-                      <option key={t.id} value={t.id}>{t.supplier_name} - {t.products?.name || t.product_id}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Quantity (caisses)</label>
-                  <input type="number" step="1" min="1" className="form-control" value={formQty}
-                    onChange={e => setFormQty(e.target.value)} placeholder="e.g. 50" autoFocus />
                 </div>
               </div>
               <div className="modal-footer">
@@ -293,15 +270,6 @@ export default function StockPage() {
                   <select className="form-select" value={formWh} onChange={e => setFormWh(e.target.value)}>
                     <option value="">Main Warehouse</option>
                     {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                  </select>
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Truck</label>
-                  <select className="form-select" value={formTruck} onChange={e => setFormTruck(e.target.value)}>
-                    <option value="">-- Select truck (optional) --</option>
-                    {trucks.map(t => (
-                      <option key={t.id} value={t.id}>{t.supplier_name} - {t.products?.name || t.product_id}</option>
-                    ))}
                   </select>
                 </div>
                 <div className="mb-3">

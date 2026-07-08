@@ -12,6 +12,7 @@ export default function DashboardPage() {
   const [memberCount, setMemberCount] = useState(0);
   const [arrivals, setArrivals] = useState<any[]>([]);
   const [caisseTypes, setCaisseTypes] = useState<any[]>([]);
+  const [caisseStats, setCaisseStats] = useState<any>({ today: { out: 0, returned: 0, missing: 0 }, week: { out: 0, returned: 0, missing: 0 }, month: { out: 0, returned: 0, missing: 0 } });
 
   useEffect(() => {
     const date = today();
@@ -20,12 +21,16 @@ export default function DashboardPage() {
       api.auth.users(),
       api.arrivals.list(date),
       api.caisse.types(),
+      api.dashboard.summary().catch(() => ({})),
     ])
-      .then(([clients, users, arr, ct]) => {
+      .then(([clients, users, arr, ct, summary]: any) => {
         setClientCount(clients?.length || 0);
         setMemberCount(users?.length || 0);
         setArrivals(arr || []);
         setCaisseTypes(ct || []);
+        if (summary?.caisse_stats) {
+          setCaisseStats(summary.caisse_stats);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -141,6 +146,44 @@ export default function DashboardPage() {
                   <small className="text-muted">Today's Total Amount</small>
                   <h4 className="mb-0 mt-1">{totalAmount.toFixed(2)}</h4>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card border-0 shadow-sm mb-4">
+            <div className="card-header bg-white"><strong><i className="bi bi-box-seam me-2" />Caisse Statistics</strong></div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-hover mb-0 align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Period</th>
+                      <th className="text-end text-warning">Outgoing</th>
+                      <th className="text-end text-success">Returned</th>
+                      <th className="text-end text-danger">Missing</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="fw-semibold"><i className="bi bi-calendar-day me-1 text-primary" />Today</td>
+                      <td className="text-end fw-bold text-warning">{caisseStats.today.out}</td>
+                      <td className="text-end fw-bold text-success">{caisseStats.today.returned}</td>
+                      <td className={`text-end fw-bold ${caisseStats.today.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.today.missing}</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold"><i className="bi bi-calendar-week me-1 text-info" />This Week</td>
+                      <td className="text-end fw-bold text-warning">{caisseStats.week.out}</td>
+                      <td className="text-end fw-bold text-success">{caisseStats.week.returned}</td>
+                      <td className={`text-end fw-bold ${caisseStats.week.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.week.missing}</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold"><i className="bi bi-calendar-month me-1 text-secondary" />This Month</td>
+                      <td className="text-end fw-bold text-warning">{caisseStats.month.out}</td>
+                      <td className="text-end fw-bold text-success">{caisseStats.month.returned}</td>
+                      <td className={`text-end fw-bold ${caisseStats.month.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.month.missing}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
