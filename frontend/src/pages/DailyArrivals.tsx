@@ -12,6 +12,7 @@ interface ArrivalRow {
   caisse_details: { caisse_type_id: string; count: number }[];
   weight: number;
   price: number;
+  amount: number;
   status: string;
 }
 
@@ -27,6 +28,29 @@ const shiftDate = (d: string, days: number) => {
   dt.setDate(dt.getDate() + days);
   return dt.toISOString().split('T')[0];
 };
+
+function ZeroInput({ value, onChange, step, min, className, style, readOnly }: {
+  value: number; onChange?: (v: number) => void; step?: string; min?: number;
+  className?: string; style?: React.CSSProperties; readOnly?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  const display = focused ? (value === 0 ? '' : String(value)) : String(value);
+  return (
+    <input
+      type="number"
+      className={className}
+      style={style}
+      step={step || '1'}
+      min={min ?? 0}
+      readOnly={readOnly}
+      value={display}
+      placeholder="0"
+      onFocus={() => { setFocused(true); }}
+      onBlur={(e) => { setFocused(false); onChange?.(Number(e.target.value) || 0); }}
+      onChange={(e) => { onChange?.(Number(e.target.value) || 0); }}
+    />
+  );
+}
 
 export default function DailyArrivals() {
   const [date, setDate] = useState(today());
@@ -47,14 +71,15 @@ export default function DailyArrivals() {
   const [showRowModal, setShowRowModal] = useState(false);
   const [editingRow, setEditingRow] = useState<ArrivalRow | null>(null);
   const [rowForm, setRowForm] = useState<ArrivalRow>({
-    client_id: '',
-    caisse_details: [],
-    weight: 0,
-    price: 0,
-    status: 'en demand',
+    client_id: '', caisse_details: [], weight: 0, price: 0, amount: 0, status: 'en demand',
   });
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [unknownMode, setUnknownMode] = useState(false);
+  const [unknownName, setUnknownName] = useState('');
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,7 +145,22 @@ export default function DailyArrivals() {
     return Math.max(0, weight - tare);
   };
 
-  const calcAmount = (netWeight: number, price: number) => netWeight * price;
+  const createCaisseMovements = async (clientId: string, caisseDetails: { caisse_type_id: string; count: number }[]) => {
+    for (const cd of caisseDetails) {
+      if (!cd.caisse_type_id || cd.count <= 0) continue;
+      try {
+        await api.caisse.createMovement({
+          client_id: clientId,
+          caisse_type_id: cd.caisse_type_id,
+          quantity: cd.count,
+          movement_type: 'out',
+          notes: `Arrival on ${date}`,
+        });
+      } catch (e) {
+        console.error('Failed to create caisse movement:', e);
+      }
+    }
+  };
 
   const handleAddTruck = async () => {
     if (!truckProductName.trim()) return;
@@ -169,21 +209,39 @@ export default function DailyArrivals() {
     }
   };
 
+  const resolveClientId = async (): Promise<string | null> => {
+    if (rowForm.client_id) return rowForm.client_id;
+    if (unknownMode) {
+      const name = unknownName.trim() || 'Unknown';
+      const existing = clients.find((c: any) => c.name === name);
+      if (existing) return existing.id;
+      const created = await api.clients.create({ name });
+      setClients(prev => [...prev, created]);
+      return created.id;
+    }
+    return null;
+  };
+
   const handleAddRow = async () => {
-    if (!selectedTruckId || !rowForm.client_id) return;
+    if (!selectedTruckId) return;
+    const clientId = await resolveClientId();
+    if (!clientId) return;
     const truck = trucks.find((t: any) => t.id === selectedTruckId);
     if (!truck) return;
     try {
+      const nw = calcNetWeight(rowForm.weight, rowForm.caisse_details);
+      const finalPrice = rowForm.amount > 0 && nw > 0 ? rowForm.amount / nw : rowForm.price;
       await api.arrivals.create({
         arrival_date: date,
         truck_id: selectedTruckId,
-        client_id: rowForm.client_id,
+        client_id: clientId,
         product_id: truck.product_id,
         caisse_details: rowForm.caisse_details,
         weight: rowForm.weight,
-        price: rowForm.price || truck.default_price,
+        price: finalPrice || truck.default_price,
         status: rowForm.status,
       });
+      await createCaisseMovements(clientId, rowForm.caisse_details);
       setShowRowModal(false);
       setEditingRow(null);
       resetRowForm();
@@ -196,11 +254,13 @@ export default function DailyArrivals() {
   const handleUpdateRow = async () => {
     if (!editingRow?.id) return;
     try {
+      const nw = calcNetWeight(rowForm.weight, rowForm.caisse_details);
+      const finalPrice = rowForm.amount > 0 && nw > 0 ? rowForm.amount / nw : rowForm.price;
       await api.arrivals.update(editingRow.id, {
         client_id: rowForm.client_id,
         caisse_details: rowForm.caisse_details,
         weight: rowForm.weight,
-        price: rowForm.price,
+        price: finalPrice,
         status: rowForm.status,
       });
       setShowRowModal(false);
@@ -223,19 +283,37 @@ export default function DailyArrivals() {
   };
 
   const handleUnknownClient = async () => {
-    let unknown = clients.find((c: any) => c.name === 'Unknown');
-    if (!unknown) {
-      unknown = await api.clients.create({ name: 'Unknown' });
-      setClients(prev => [...prev, unknown]);
-    }
-    setRowForm(prev => ({ ...prev, client_id: unknown.id }));
-    setClientSearch('Unknown');
+    setUnknownMode(true);
+    setUnknownName('');
+    setRowForm(prev => ({ ...prev, client_id: '' }));
+    setClientSearch('');
     setShowClientDropdown(false);
+    setShowNewClientForm(false);
+  };
+
+  const handleCreateClient = async () => {
+    if (!newClientName.trim()) return;
+    try {
+      const created = await api.clients.create({ name: newClientName.trim(), phone: newClientPhone.trim() || undefined });
+      setClients(prev => [...prev, created]);
+      setRowForm(prev => ({ ...prev, client_id: created.id }));
+      setClientSearch(created.name);
+      setShowNewClientForm(false);
+      setNewClientName('');
+      setNewClientPhone('');
+      setShowClientDropdown(false);
+      setUnknownMode(false);
+    } catch (e: any) {
+      alert(e.message);
+    }
   };
 
   const resetRowForm = () => {
-    setRowForm({ client_id: '', caisse_details: [], weight: 0, price: 0, status: 'en demand' });
+    setRowForm({ client_id: '', caisse_details: [], weight: 0, price: 0, amount: 0, status: 'en demand' });
     setClientSearch('');
+    setUnknownMode(false);
+    setUnknownName('');
+    setShowNewClientForm(false);
   };
 
   const openAddRow = (truckId: string) => {
@@ -248,14 +326,17 @@ export default function DailyArrivals() {
   const openEditRow = (arrival: Arrival) => {
     setSelectedTruckId(arrival.truck_id);
     setEditingRow(arrival);
+    const nw = calcNetWeight(arrival.weight || 0, Array.isArray(arrival.caisse_details) ? arrival.caisse_details : []);
     setRowForm({
       client_id: arrival.client_id,
       caisse_details: Array.isArray(arrival.caisse_details) ? arrival.caisse_details : [],
       weight: arrival.weight || 0,
       price: arrival.price || 0,
+      amount: nw * (arrival.price || 0),
       status: arrival.status || 'en demand',
     });
     setClientSearch(arrival.clients?.name || '');
+    setUnknownMode(false);
     setShowRowModal(true);
   };
 
@@ -287,7 +368,7 @@ export default function DailyArrivals() {
     for (const a of truckArrivals) {
       const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
       totalNetWeight += nw;
-      totalAmount += calcAmount(nw, a.price || 0);
+      totalAmount += nw * (a.price || 0);
     }
     return { totalNetWeight, totalAmount };
   };
@@ -299,13 +380,17 @@ export default function DailyArrivals() {
     for (const a of arrivals) {
       const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
       totalNetWeight += nw;
-      totalAmount += calcAmount(nw, a.price || 0);
+      totalAmount += nw * (a.price || 0);
       totalEntries++;
     }
     return { totalNetWeight, totalAmount, totalEntries };
   }, [arrivals, caisseTypes]);
 
   const isToday = date === today();
+  const formNetWeight = calcNetWeight(rowForm.weight, rowForm.caisse_details);
+  const formAmount = rowForm.amount > 0 && formNetWeight > 0
+    ? rowForm.amount
+    : formNetWeight * rowForm.price;
 
   return (
     <div>
@@ -424,7 +509,7 @@ export default function DailyArrivals() {
                         <tbody>
                           {truckArrivals.map((a: any, idx: number) => {
                             const nw = calcNetWeight(a.weight || 0, Array.isArray(a.caisse_details) ? a.caisse_details : []);
-                            const amt = calcAmount(nw, a.price || 0);
+                            const amt = nw * (a.price || 0);
                             const totalCrates = (Array.isArray(a.caisse_details) ? a.caisse_details : []).reduce((s: number, cd: any) => s + (cd.count || 0), 0);
                             return (
                               <tr key={a.id}>
@@ -545,29 +630,65 @@ export default function DailyArrivals() {
               <div className="modal-body">
                 <div className="mb-3 position-relative">
                   <label className="form-label">Client</label>
-                  <input type="text" className="form-control" value={clientSearch}
-                    placeholder="Search client..."
-                    onChange={e => { setClientSearch(e.target.value); setRowForm({ ...rowForm, client_id: '' }); setShowClientDropdown(true); }}
-                    onFocus={() => setShowClientDropdown(true)} />
-                  {showClientDropdown && clientSearch && !rowForm.client_id && (
-                    <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 180, overflow: 'auto' }}>
-                      {filteredClients.map((c: any) => (
-                        <button key={c.id} type="button" className="list-group-item list-group-item-action py-1"
-                          onMouseDown={() => {
-                            setRowForm({ ...rowForm, client_id: c.id });
-                            setClientSearch(c.name);
-                            setShowClientDropdown(false);
-                          }}>
-                          <div className="fw-medium">{c.name}</div>
-                          <small className="text-muted">{c.phone || ''}</small>
+                  {!unknownMode && !showNewClientForm ? (
+                    <>
+                      <div className="d-flex gap-1">
+                        <input type="text" className="form-control" value={clientSearch}
+                          placeholder="Search client..."
+                          onChange={e => { setClientSearch(e.target.value); setRowForm({ ...rowForm, client_id: '' }); setShowClientDropdown(true); setUnknownMode(false); }}
+                          onFocus={() => setShowClientDropdown(true)} />
+                        <button className="btn btn-outline-success btn-sm" title="Add new client"
+                          onClick={() => { setShowNewClientForm(true); setNewClientName(''); setNewClientPhone(''); }}>
+                          <i className="bi bi-plus-lg" />
                         </button>
-                      ))}
-                      {filteredClients.length === 0 && <div className="list-group-item text-muted small">No clients found</div>}
+                      </div>
+                      {showClientDropdown && clientSearch && !rowForm.client_id && (
+                        <div className="list-group position-absolute w-100" style={{ zIndex: 1050, maxHeight: 150, overflow: 'auto' }}>
+                          {filteredClients.map((c: any) => (
+                            <button key={c.id} type="button" className="list-group-item list-group-item-action py-1"
+                              onMouseDown={() => {
+                                setRowForm({ ...rowForm, client_id: c.id });
+                                setClientSearch(c.name);
+                                setShowClientDropdown(false);
+                              }}>
+                              <div className="fw-medium">{c.name}</div>
+                              <small className="text-muted">{c.phone || ''}</small>
+                            </button>
+                          ))}
+                          {filteredClients.length === 0 && <div className="list-group-item text-muted small">No clients found</div>}
+                        </div>
+                      )}
+                      <button type="button" className="btn btn-sm btn-outline-warning mt-1" onClick={handleUnknownClient}>
+                        <i className="bi bi-person-dash me-1" />Unknown Client
+                      </button>
+                    </>
+                  ) : showNewClientForm ? (
+                    <div className="border rounded p-2 bg-light">
+                      <input type="text" className="form-control form-control-sm mb-1" placeholder="Client name"
+                        value={newClientName} onChange={e => setNewClientName(e.target.value)} autoFocus />
+                      <input type="text" className="form-control form-control-sm mb-1" placeholder="Phone (optional)"
+                        value={newClientPhone} onChange={e => setNewClientPhone(e.target.value)} />
+                      <div className="d-flex gap-1">
+                        <button className="btn btn-sm btn-primary" onClick={handleCreateClient} disabled={!newClientName.trim()}>Save</button>
+                        <button className="btn btn-sm btn-secondary" onClick={() => { setShowNewClientForm(false); setUnknownMode(false); }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border rounded p-2 bg-light">
+                      <label className="form-label small mb-1">Client Name</label>
+                      <input type="text" className="form-control form-control-sm mb-1" placeholder="Unknown"
+                        value={unknownName} onChange={e => setUnknownName(e.target.value)} autoFocus />
+                      <small className="text-muted d-block mb-1">Leave blank for "Unknown"</small>
+                      <div className="d-flex gap-1">
+                        <button className="btn btn-sm btn-primary" onClick={() => {
+                          const name = unknownName.trim() || 'Unknown';
+                          setClientSearch(name);
+                          setUnknownMode(false);
+                        }}>Confirm</button>
+                        <button className="btn btn-sm btn-secondary" onClick={() => { setUnknownMode(false); setUnknownName(''); }}>Cancel</button>
+                      </div>
                     </div>
                   )}
-                  <button type="button" className="btn btn-sm btn-outline-warning mt-1" onClick={handleUnknownClient}>
-                    <i className="bi bi-person-dash me-1" />Unknown Client
-                  </button>
                 </div>
 
                 <div className="mb-3">
@@ -577,13 +698,12 @@ export default function DailyArrivals() {
                       <select className="form-select form-select-sm" style={{ flex: 2 }} value={cd.caisse_type_id}
                         onChange={e => updateCaisseDetail(idx, 'caisse_type_id', e.target.value)}>
                         <option value="">Select type...</option>
-                        {caisseTypes.filter((ct: any) => ct.category !== 'client').map((ct: any) => (
+                        {caisseTypes.map((ct: any) => (
                           <option key={ct.id} value={ct.id}>{ct.name} ({ct.tare}kg tare)</option>
                         ))}
                       </select>
-                      <input type="number" className="form-control form-control-sm" style={{ width: 80 }} min={0}
-                        placeholder="Qty" value={cd.count}
-                        onChange={e => updateCaisseDetail(idx, 'count', Number(e.target.value))} />
+                      <ZeroInput value={cd.count} className="form-control form-control-sm" style={{ width: 80 }}
+                        onChange={v => updateCaisseDetail(idx, 'count', v)} />
                       <button className="btn btn-sm btn-outline-danger" onClick={() => removeCaisseDetail(idx)}>
                         <i className="bi bi-x" />
                       </button>
@@ -595,15 +715,20 @@ export default function DailyArrivals() {
                 </div>
 
                 <div className="row">
-                  <div className="col-6 mb-3">
+                  <div className="col-4 mb-3">
                     <label className="form-label">Weight (kg)</label>
-                    <input type="number" className="form-control" step="0.1" min={0} value={rowForm.weight}
-                      onChange={e => setRowForm({ ...rowForm, weight: Number(e.target.value) })} />
+                    <ZeroInput value={rowForm.weight} className="form-control"
+                      step="0.1" onChange={v => setRowForm({ ...rowForm, weight: v })} />
                   </div>
-                  <div className="col-6 mb-3">
+                  <div className="col-4 mb-3">
+                    <label className="form-label">Amount</label>
+                    <ZeroInput value={rowForm.amount} className="form-control"
+                      step="0.01" onChange={v => setRowForm({ ...rowForm, amount: v })} />
+                  </div>
+                  <div className="col-4 mb-3">
                     <label className="form-label">Price (/kg)</label>
-                    <input type="number" className="form-control" step="0.01" min={0} value={rowForm.price}
-                      onChange={e => setRowForm({ ...rowForm, price: Number(e.target.value) })} />
+                    <ZeroInput value={rowForm.price} className="form-control"
+                      step="0.01" onChange={v => setRowForm({ ...rowForm, price: v })} />
                   </div>
                 </div>
 
@@ -611,12 +736,12 @@ export default function DailyArrivals() {
                   <div className="col-6 mb-3">
                     <label className="form-label">Net Weight</label>
                     <input type="text" className="form-control fw-bold" readOnly
-                      value={`${calcNetWeight(rowForm.weight, rowForm.caisse_details).toFixed(1)} kg`} />
+                      value={`${formNetWeight.toFixed(1)} kg`} />
                   </div>
                   <div className="col-6 mb-3">
-                    <label className="form-label">Amount</label>
+                    <label className="form-label">Total Amount</label>
                     <input type="text" className="form-control fw-bold" readOnly
-                      value={calcAmount(calcNetWeight(rowForm.weight, rowForm.caisse_details), rowForm.price).toFixed(2)} />
+                      value={formAmount.toFixed(2)} />
                   </div>
                 </div>
 
@@ -633,7 +758,7 @@ export default function DailyArrivals() {
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => { setShowRowModal(false); setEditingRow(null); }}>Cancel</button>
                 <button className="btn btn-primary" onClick={editingRow ? handleUpdateRow : handleAddRow}
-                  disabled={!rowForm.client_id}>
+                  disabled={!rowForm.client_id && !unknownMode}>
                   {editingRow ? 'Save Changes' : 'Add Entry'}
                 </button>
               </div>
