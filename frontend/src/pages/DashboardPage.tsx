@@ -12,7 +12,7 @@ export default function DashboardPage() {
   const [memberCount, setMemberCount] = useState(0);
   const [arrivals, setArrivals] = useState<any[]>([]);
   const [caisseTypes, setCaisseTypes] = useState<any[]>([]);
-  const [caisseStats, setCaisseStats] = useState<any>({ today: { out: 0, returned: 0, missing: 0 }, week: { out: 0, returned: 0, missing: 0 }, month: { out: 0, returned: 0, missing: 0 } });
+  const [caisseStats, setCaisseStats] = useState<any>({ today: { out: 0, returned: 0, missing: 0 }, yesterday: { out: 0, returned: 0, missing: 0 }, week: { out: 0, returned: 0, missing: 0 }, month: { out: 0, returned: 0, missing: 0 } });
 
   useEffect(() => {
     const date = today();
@@ -153,37 +153,118 @@ export default function DashboardPage() {
           <div className="card border-0 shadow-sm mb-4">
             <div className="card-header bg-white"><strong><i className="bi bi-box-seam me-2" />Caisse Statistics</strong></div>
             <div className="card-body">
-              <div className="table-responsive">
-                <table className="table table-hover mb-0 align-middle">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Period</th>
-                      <th className="text-end text-warning">Outgoing</th>
-                      <th className="text-end text-success">Returned</th>
-                      <th className="text-end text-danger">Missing</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="fw-semibold"><i className="bi bi-calendar-day me-1 text-primary" />Today</td>
-                      <td className="text-end fw-bold text-warning">{caisseStats.today.out}</td>
-                      <td className="text-end fw-bold text-success">{caisseStats.today.returned}</td>
-                      <td className={`text-end fw-bold ${caisseStats.today.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.today.missing}</td>
-                    </tr>
-                    <tr>
-                      <td className="fw-semibold"><i className="bi bi-calendar-week me-1 text-info" />This Week</td>
-                      <td className="text-end fw-bold text-warning">{caisseStats.week.out}</td>
-                      <td className="text-end fw-bold text-success">{caisseStats.week.returned}</td>
-                      <td className={`text-end fw-bold ${caisseStats.week.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.week.missing}</td>
-                    </tr>
-                    <tr>
-                      <td className="fw-semibold"><i className="bi bi-calendar-month me-1 text-secondary" />This Month</td>
-                      <td className="text-end fw-bold text-warning">{caisseStats.month.out}</td>
-                      <td className="text-end fw-bold text-success">{caisseStats.month.returned}</td>
-                      <td className={`text-end fw-bold ${caisseStats.month.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.month.missing}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="row g-3">
+                {/* Today */}
+                <div className="col-md-3">
+                  <div className="card border-0 bg-primary bg-opacity-10 h-100">
+                    <div className="card-body text-center">
+                      <div className="d-flex align-items-center justify-content-center mb-2">
+                        <div className="rounded-circle bg-primary bg-opacity-25 p-2">
+                          <i className="bi bi-calendar-day text-primary fs-5" />
+                        </div>
+                      </div>
+                      <h6 className="text-primary mb-3">Today</h6>
+                      <div className="d-flex justify-content-around">
+                        <div>
+                          <div className="fs-4 fw-bold text-warning">{caisseStats.today.out}</div>
+                          <small className="text-muted">Out</small>
+                        </div>
+                        <div>
+                          <div className="fs-4 fw-bold text-success">{caisseStats.today.returned}</div>
+                          <small className="text-muted">Returned</small>
+                        </div>
+                        <div>
+                          <div className={`fs-4 fw-bold ${caisseStats.today.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.today.missing}</div>
+                          <small className="text-muted">Missing</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Yesterday */}
+                <div className="col-md-3">
+                  <div className="card border-0 bg-secondary bg-opacity-10 h-100">
+                    <div className="card-body text-center">
+                      <div className="d-flex align-items-center justify-content-center mb-2">
+                        <div className="rounded-circle bg-secondary bg-opacity-25 p-2">
+                          <i className="bi bi-calendar-minus text-secondary fs-5" />
+                        </div>
+                      </div>
+                      <h6 className="text-secondary mb-3">Yesterday</h6>
+                      <div className="d-flex justify-content-around">
+                        <div>
+                          <div className="fs-4 fw-bold text-warning">{caisseStats.yesterday.out}</div>
+                          <small className="text-muted">Out</small>
+                        </div>
+                        <div>
+                          <div className="fs-4 fw-bold text-success">{caisseStats.yesterday.returned}</div>
+                          <small className="text-muted">Returned</small>
+                        </div>
+                        <div>
+                          <div className={`fs-4 fw-bold ${caisseStats.yesterday.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.yesterday.missing}</div>
+                          <small className="text-muted">Missing</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* This Week */}
+                <div className="col-md-3">
+                  <div className="card border-0 bg-info bg-opacity-10 h-100">
+                    <div className="card-body text-center">
+                      <div className="d-flex align-items-center justify-content-center mb-2">
+                        <div className="rounded-circle bg-info bg-opacity-25 p-2">
+                          <i className="bi bi-calendar-week text-info fs-5" />
+                        </div>
+                      </div>
+                      <h6 className="text-info mb-3">This Week</h6>
+                      <div className="d-flex justify-content-around">
+                        <div>
+                          <div className="fs-4 fw-bold text-warning">{caisseStats.week.out}</div>
+                          <small className="text-muted">Out</small>
+                        </div>
+                        <div>
+                          <div className="fs-4 fw-bold text-success">{caisseStats.week.returned}</div>
+                          <small className="text-muted">Returned</small>
+                        </div>
+                        <div>
+                          <div className={`fs-4 fw-bold ${caisseStats.week.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.week.missing}</div>
+                          <small className="text-muted">Missing</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* This Month */}
+                <div className="col-md-3">
+                  <div className="card border-0 bg-warning bg-opacity-10 h-100">
+                    <div className="card-body text-center">
+                      <div className="d-flex align-items-center justify-content-center mb-2">
+                        <div className="rounded-circle bg-warning bg-opacity-25 p-2">
+                          <i className="bi bi-calendar-month text-warning fs-5" />
+                        </div>
+                      </div>
+                      <h6 className="text-warning mb-3">This Month</h6>
+                      <div className="d-flex justify-content-around">
+                        <div>
+                          <div className="fs-4 fw-bold text-warning">{caisseStats.month.out}</div>
+                          <small className="text-muted">Out</small>
+                        </div>
+                        <div>
+                          <div className="fs-4 fw-bold text-success">{caisseStats.month.returned}</div>
+                          <small className="text-muted">Returned</small>
+                        </div>
+                        <div>
+                          <div className={`fs-4 fw-bold ${caisseStats.month.missing > 0 ? 'text-danger' : 'text-success'}`}>{caisseStats.month.missing}</div>
+                          <small className="text-muted">Missing</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

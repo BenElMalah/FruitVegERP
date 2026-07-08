@@ -79,11 +79,15 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
 
   const isExcluded = (m: any) => m.movement_type === 'return' && firstReturnPerClient.get(m.client_id) === m.id;
 
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = today.toISOString();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString();
   const weekStr = weekAgo.toISOString();
 
-  const calcStats = (fromDate: string) => {
-    const filtered = movements.filter((m: any) => m.created_at >= fromDate);
+  const calcStats = (fromDate: string, toDate?: string) => {
+    let filtered = movements.filter((m: any) => m.created_at >= fromDate);
+    if (toDate) filtered = filtered.filter((m: any) => m.created_at < toDate);
     let out = 0, returned = 0;
     filtered.forEach((m: any) => {
       if (isExcluded(m)) return;
@@ -95,6 +99,7 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
 
   const caisseStats = {
     today: calcStats(todayStr),
+    yesterday: calcStats(yesterdayStr, todayStr),
     week: calcStats(weekStr),
     month: calcStats(monthStart.toISOString()),
   };
