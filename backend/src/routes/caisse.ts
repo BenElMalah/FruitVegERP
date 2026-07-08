@@ -182,9 +182,9 @@ router.get('/missing', authorize('boss', 'manager'), async (req: AuthRequest, re
     if (balance && balance.length > 0) {
       const totalOut = balance.reduce((sum: number, b: any) => sum + (b.total_out || 0), 0);
       const totalReturned = balance.reduce((sum: number, b: any) => sum + (b.total_returned || 0), 0);
-      if (totalOut - totalReturned > 0) {
-        missing.push({ client: client.name, total_out: totalOut, total_returned: totalReturned, balance: totalOut - totalReturned });
-      }
+      missing.push({ client_id: client.id, client: client.name, total_out: totalOut, total_returned: totalReturned, balance: totalOut - totalReturned });
+    } else {
+      missing.push({ client_id: client.id, client: client.name, total_out: 0, total_returned: 0, balance: 0 });
     }
   }
 

@@ -21,9 +21,12 @@ export default function ClientsPage() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterCaissesMin, setFilterCaissesMin] = useState('');
   const [filterCaissesMax, setFilterCaissesMax] = useState('');
+  const [filterMissingMin, setFilterMissingMin] = useState('');
+  const [filterMissingMax, setFilterMissingMax] = useState('');
   const [filterDueMin, setFilterDueMin] = useState('');
   const [filterDueMax, setFilterDueMax] = useState('');
   const [showDueColumn, setShowDueColumn] = useState(false);
+  const [showMissingColumn, setShowMissingColumn] = useState(true);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
   const [viewClient, setViewClient] = useState<any>(null);
@@ -32,16 +35,21 @@ export default function ClientsPage() {
   const [viewPayments, setViewPayments] = useState<any[]>([]);
   const [viewCaisse, setViewCaisse] = useState<any[]>([]);
   const [viewLoading, setViewLoading] = useState(false);
+  const [missingMap, setMissingMap] = useState<Map<string, number>>(new Map());
 
   const canEdit = user?.role === 'boss' || user?.role === 'manager';
 
   const load = async () => {
-    const [list, dups] = await Promise.all([
+    const [list, dups, missing] = await Promise.all([
       api.clients.list(),
       api.clients.duplicates().catch(() => []),
+      api.caisse.missing().catch(() => []),
     ]);
     setClients(list);
     setDupCount(dups.length);
+    const map = new Map<string, number>();
+    missing.forEach((m: any) => { if (m.client_id) map.set(m.client_id, m.balance || 0); });
+    setMissingMap(map);
   };
   useEffect(() => { load(); }, []);
 
@@ -211,10 +219,12 @@ export default function ClientsPage() {
     if (filterDateTo) result = result.filter(c => c.created_at && c.created_at <= filterDateTo + 'T23:59:59');
     if (filterCaissesMin !== '') result = result.filter(c => (c.total_caisses || 0) >= Number(filterCaissesMin));
     if (filterCaissesMax !== '') result = result.filter(c => (c.total_caisses || 0) <= Number(filterCaissesMax));
+    if (filterMissingMin !== '') result = result.filter(c => (missingMap.get(c.id) || 0) >= Number(filterMissingMin));
+    if (filterMissingMax !== '') result = result.filter(c => (missingMap.get(c.id) || 0) <= Number(filterMissingMax));
     if (filterDueMin !== '') result = result.filter(c => (c.total_due || 0) >= Number(filterDueMin));
     if (filterDueMax !== '') result = result.filter(c => (c.total_due || 0) <= Number(filterDueMax));
     return result;
-  }, [clients, searchQuery, filterDateFrom, filterDateTo, filterCaissesMin, filterCaissesMax, filterDueMin, filterDueMax]);
+  }, [clients, searchQuery, filterDateFrom, filterDateTo, filterCaissesMin, filterCaissesMax, filterMissingMin, filterMissingMax, filterDueMin, filterDueMax, missingMap]);
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / rowsPerPage));
   const paginatedClients = filteredClients.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -225,11 +235,13 @@ export default function ClientsPage() {
     setFilterDateTo('');
     setFilterCaissesMin('');
     setFilterCaissesMax('');
+    setFilterMissingMin('');
+    setFilterMissingMax('');
     setFilterDueMin('');
     setFilterDueMax('');
     setCurrentPage(1);
   };
-  const hasActiveFilters = searchQuery || filterDateFrom || filterDateTo || filterCaissesMin || filterCaissesMax || filterDueMin || filterDueMax;
+  const hasActiveFilters = searchQuery || filterDateFrom || filterDateTo || filterCaissesMin || filterCaissesMax || filterMissingMin || filterMissingMax || filterDueMin || filterDueMax;
 
   return (
     <div>
@@ -295,6 +307,14 @@ export default function ClientsPage() {
               <i className={`bi bi-eye${showDueColumn ? '' : '-slash'} me-1`} />
               Due
             </button>
+            <button
+              className={`btn btn-sm ${showMissingColumn ? 'btn-secondary' : 'btn-outline-secondary'}`}
+              onClick={() => setShowMissingColumn(!showMissingColumn)}
+              title={showMissingColumn ? 'Hide Missing column' : 'Show Missing column'}
+            >
+              <i className={`bi bi-eye${showMissingColumn ? '' : '-slash'} me-1`} />
+              Missing
+            </button>
             <span className="text-muted ms-auto small">
               Showing {paginatedClients.length} of {filteredClients.length} clients
             </span>
@@ -318,6 +338,14 @@ export default function ClientsPage() {
                 <div style={{ minWidth: 90 }}>
                   <label className="form-label small text-muted mb-1">Caisses Max</label>
                   <input type="number" className="form-control form-control-sm" placeholder="Max" value={filterCaissesMax} onChange={e => { setFilterCaissesMax(e.target.value); setCurrentPage(1); }} />
+                </div>
+                <div style={{ minWidth: 90 }}>
+                  <label className="form-label small text-muted mb-1">Missing Min</label>
+                  <input type="number" className="form-control form-control-sm" placeholder="Min" value={filterMissingMin} onChange={e => { setFilterMissingMin(e.target.value); setCurrentPage(1); }} />
+                </div>
+                <div style={{ minWidth: 90 }}>
+                  <label className="form-label small text-muted mb-1">Missing Max</label>
+                  <input type="number" className="form-control form-control-sm" placeholder="Max" value={filterMissingMax} onChange={e => { setFilterMissingMax(e.target.value); setCurrentPage(1); }} />
                 </div>
                 <div style={{ minWidth: 90 }}>
                   <label className="form-label small text-muted mb-1">Due Min</label>
@@ -344,6 +372,7 @@ export default function ClientsPage() {
                 <th>{t('Phone')}</th>
                 <th>{t('Address')}</th>
                 <th className="text-end">{t('Caisses')}</th>
+                {showMissingColumn && <th className="text-end">{t('Missing')}</th>}
                 {showDueColumn && <th className="text-end">{t('Due')}</th>}
                 <th style={{ width: 100 }}>{t('Actions')}</th>
               </tr>
@@ -356,6 +385,18 @@ export default function ClientsPage() {
                   <td>{c.phone || <span className="text-muted">-</span>}</td>
                   <td><small>{c.address || '-'}</small></td>
                   <td className="text-end"><span className="badge bg-info bg-opacity-25 text-info-emphasis">{c.total_caisses || 0}</span></td>
+                  {showMissingColumn && (
+                    <td className="text-end">
+                      {(() => {
+                        const missing = missingMap.get(c.id) || 0;
+                        return missing > 0 ? (
+                          <span className="badge bg-danger bg-opacity-25 text-danger-emphasis">{missing}</span>
+                        ) : (
+                          <span className="text-muted">0</span>
+                        );
+                      })()}
+                    </td>
+                  )}
                   {showDueColumn && (
                     <td className="text-end">
                       <span className={`fw-semibold ${(c.total_due || 0) > 0 ? 'text-danger' : 'text-success'}`}>
@@ -389,7 +430,7 @@ export default function ClientsPage() {
               ))}
               {!paginatedClients.length && (
                 <tr>
-                  <td colSpan={showDueColumn ? 7 : 6} className="text-center text-muted py-5">
+                  <td colSpan={showDueColumn && showMissingColumn ? 8 : showDueColumn || showMissingColumn ? 7 : 6} className="text-center text-muted py-5">
                     <i className="bi bi-inbox display-6 d-block mb-2 opacity-50" />
                     No clients found
                   </td>

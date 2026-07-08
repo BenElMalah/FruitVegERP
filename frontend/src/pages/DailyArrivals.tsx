@@ -229,8 +229,6 @@ export default function DailyArrivals() {
     const truck = trucks.find((t: any) => t.id === selectedTruckId);
     if (!truck) return;
     try {
-      const nw = calcNetWeight(rowForm.weight, rowForm.caisse_details);
-      const finalPrice = rowForm.amount > 0 && nw > 0 ? rowForm.amount / nw : rowForm.price;
       await api.arrivals.create({
         arrival_date: date,
         truck_id: selectedTruckId,
@@ -238,7 +236,7 @@ export default function DailyArrivals() {
         product_id: truck.product_id,
         caisse_details: rowForm.caisse_details,
         weight: rowForm.weight,
-        price: finalPrice || truck.default_price,
+        price: rowForm.price || truck.default_price,
         status: rowForm.status,
       });
       await createCaisseMovements(clientId, rowForm.caisse_details);
@@ -254,13 +252,11 @@ export default function DailyArrivals() {
   const handleUpdateRow = async () => {
     if (!editingRow?.id) return;
     try {
-      const nw = calcNetWeight(rowForm.weight, rowForm.caisse_details);
-      const finalPrice = rowForm.amount > 0 && nw > 0 ? rowForm.amount / nw : rowForm.price;
       await api.arrivals.update(editingRow.id, {
         client_id: rowForm.client_id,
         caisse_details: rowForm.caisse_details,
         weight: rowForm.weight,
-        price: finalPrice,
+        price: rowForm.price,
         status: rowForm.status,
       });
       setShowRowModal(false);
@@ -351,15 +347,17 @@ export default function DailyArrivals() {
     setRowForm(prev => {
       const details = [...prev.caisse_details];
       details[index] = { ...details[index], [field]: value };
-      return { ...prev, caisse_details: details };
+      const nw = calcNetWeight(prev.weight, details);
+      return { ...prev, caisse_details: details, amount: nw * prev.price };
     });
   };
 
   const removeCaisseDetail = (index: number) => {
-    setRowForm(prev => ({
-      ...prev,
-      caisse_details: prev.caisse_details.filter((_, i) => i !== index),
-    }));
+    setRowForm(prev => {
+      const details = prev.caisse_details.filter((_, i) => i !== index);
+      const nw = calcNetWeight(prev.weight, details);
+      return { ...prev, caisse_details: details, amount: nw * prev.price };
+    });
   };
 
   const totalsForTruck = (truckArrivals: Arrival[]) => {
@@ -388,9 +386,6 @@ export default function DailyArrivals() {
 
   const isToday = date === today();
   const formNetWeight = calcNetWeight(rowForm.weight, rowForm.caisse_details);
-  const formAmount = rowForm.amount > 0 && formNetWeight > 0
-    ? rowForm.amount
-    : formNetWeight * rowForm.price;
 
   return (
     <div>
@@ -715,33 +710,28 @@ export default function DailyArrivals() {
                 </div>
 
                 <div className="row">
-                  <div className="col-4 mb-3">
+                  <div className="col-3 mb-3">
                     <label className="form-label">Weight (kg)</label>
                     <ZeroInput value={rowForm.weight} className="form-control"
-                      step="0.1" onChange={v => setRowForm({ ...rowForm, weight: v })} />
+                      step="0.1" onChange={v => {
+                        const nw = calcNetWeight(v, rowForm.caisse_details);
+                        setRowForm({ ...rowForm, weight: v, amount: nw * rowForm.price });
+                      }} />
                   </div>
-                  <div className="col-4 mb-3">
-                    <label className="form-label">Amount</label>
-                    <ZeroInput value={rowForm.amount} className="form-control"
-                      step="0.01" onChange={v => setRowForm({ ...rowForm, amount: v })} />
-                  </div>
-                  <div className="col-4 mb-3">
-                    <label className="form-label">Price (/kg)</label>
-                    <ZeroInput value={rowForm.price} className="form-control"
-                      step="0.01" onChange={v => setRowForm({ ...rowForm, price: v })} />
-                  </div>
-                </div>
-
-                <div className="row">
-                  <div className="col-6 mb-3">
+                  <div className="col-3 mb-3">
                     <label className="form-label">Net Weight</label>
                     <input type="text" className="form-control fw-bold" readOnly
                       value={`${formNetWeight.toFixed(1)} kg`} />
                   </div>
-                  <div className="col-6 mb-3">
-                    <label className="form-label">Total Amount</label>
-                    <input type="text" className="form-control fw-bold" readOnly
-                      value={formAmount.toFixed(2)} />
+                  <div className="col-3 mb-3">
+                    <label className="form-label">Price (/kg)</label>
+                    <ZeroInput value={rowForm.price} className="form-control"
+                      step="0.01" onChange={v => setRowForm({ ...rowForm, price: v, amount: formNetWeight * v })} />
+                  </div>
+                  <div className="col-3 mb-3">
+                    <label className="form-label">Amount</label>
+                    <ZeroInput value={rowForm.amount} className="form-control"
+                      step="0.01" onChange={v => setRowForm({ ...rowForm, amount: v, price: formNetWeight > 0 ? v / formNetWeight : 0 })} />
                   </div>
                 </div>
 

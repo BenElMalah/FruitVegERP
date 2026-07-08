@@ -1,6 +1,10 @@
 -- Clean fix: drop and recreate everything needed
 
-DROP TRIGGER IF EXISTS trg_notify_on_delivery ON public.daily_arrivals;
+-- Drop triggers first (before dropping their tables)
+DO $$ BEGIN
+  DROP TRIGGER IF EXISTS trg_notify_on_delivery ON public.daily_arrivals;
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
 
 DROP TABLE IF EXISTS public.daily_arrivals CASCADE;
 DROP TABLE IF EXISTS public.caisse_movements CASCADE;
