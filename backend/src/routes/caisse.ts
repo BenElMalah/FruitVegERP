@@ -140,12 +140,16 @@ router.delete('/movements/:id', authorize('boss', 'manager', 'warehouse'), async
 });
 
 router.delete('/movements-by-client', authorize('boss', 'manager', 'warehouse'), async (req: AuthRequest, res: Response) => {
-  const { client_id, notes_like } = req.body;
+  const { client_id, notes_like, notes_exact } = req.body;
 
   if (!client_id) return res.status(400).json({ error: 'client_id required' });
 
   let query = supabaseAdmin.from('caisse_movements').delete().eq('client_id', client_id);
-  if (notes_like) query = query.like('notes', notes_like);
+  if (notes_exact) {
+    query = query.eq('notes', notes_exact);
+  } else if (notes_like) {
+    query = query.like('notes', `%${notes_like}%`);
+  }
 
   const { error } = await query;
   if (error) return res.status(400).json({ error: error.message });

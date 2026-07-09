@@ -252,8 +252,10 @@ export default function DailyArrivals() {
   const handleUpdateRow = async () => {
     if (!editingRow?.id) return;
     try {
-      // Delete old caisse movements for this specific arrival
+      // Delete old caisse movements for this specific arrival (both formats)
       await api.caisse.deleteMovementsByClient(editingRow.client_id, `arrival:${editingRow.id}`).catch(() => {});
+      // Also clean up any old-format movements for this client on this date
+      await api.caisse.deleteMovementsByClient(editingRow.client_id, `Arrival on ${date}`).catch(() => {});
       // Update the entry
       await api.arrivals.update(editingRow.id, {
         client_id: rowForm.client_id,
@@ -279,7 +281,10 @@ export default function DailyArrivals() {
       // Find the entry to get client_id for caisse movement cleanup
       const entry = arrivals.find((a: any) => a.id === id);
       if (entry?.client_id) {
+        // Delete movements with new format (arrival:{id})
         await api.caisse.deleteMovementsByClient(entry.client_id, `arrival:${id}`).catch(() => {});
+        // Also delete movements with old format (Arrival on {date}) for this client
+        await api.caisse.deleteMovementsByClient(entry.client_id, `Arrival on ${date}`).catch(() => {});
       }
       await api.arrivals.delete(id);
       load();
