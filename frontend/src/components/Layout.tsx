@@ -24,12 +24,9 @@ const navByRole: Record<string, NavItem[]> = {
   ],
   boss: [
     { path: '/', labelKey: 'Dashboard', icon: 'bi-grid' },
-    { path: '/users', labelKey: 'Members', icon: 'bi-person-badge' },
     { path: '/clients', labelKey: 'Clients', icon: 'bi-people' },
-    { path: '/caisse', labelKey: 'Caisses', icon: 'bi-box-seam' },
     { path: '/arrivals', labelKey: 'Daily Arrivals', icon: 'bi-truck' },
     { path: '/stock', labelKey: 'Stock', icon: 'bi-boxes' },
-    { path: '/alerts', labelKey: 'Alerts', icon: 'bi-bell' },
   ],
 };
 

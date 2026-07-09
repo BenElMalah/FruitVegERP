@@ -27,7 +27,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   res.json(data);
 });
 
-router.post('/', authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   const { name, phone, address, credit_limit, notes } = req.body;
 
   const { data: existing } = await supabaseAdmin
@@ -45,6 +45,28 @@ router.post('/', authorize('boss', 'manager'), async (req: AuthRequest, res: Res
     .single();
 
   if (error) return res.status(400).json({ error: error.message });
+
+  // If created by collector, notify managers/bosses
+  if (req.user!.role === 'collector') {
+    const { data: managers } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .in('role', ['boss', 'manager'])
+      .eq('status', 'active');
+
+    if (managers && managers.length > 0) {
+      const notifications = managers.map((m: any) => ({
+        user_id: m.id,
+        title: 'New Client Added',
+        message: `${req.user!.name} added a new client: ${name}`,
+        type: 'info',
+        reference_type: 'client',
+        reference_id: data.id,
+      }));
+      await supabaseAdmin.from('notifications').insert(notifications);
+    }
+  }
+
   res.status(201).json(data);
 });
 

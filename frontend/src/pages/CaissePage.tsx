@@ -303,7 +303,7 @@ export default function CaissePage() {
       {tab === 'types' && (
         <>
           <div className="d-flex justify-content-end mb-3">
-            {canManage && <button className="btn btn-primary" onClick={openAddType}><i className="bi bi-plus-lg me-1" />{t('Add Type')}</button>}
+            {canEdit && <button className="btn btn-primary" onClick={openAddType}><i className="bi bi-plus-lg me-1" />{t('Add Type')}</button>}
           </div>
           <div className="card">
             <div className="card-body p-0">

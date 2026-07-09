@@ -28,6 +28,8 @@ export default function ClientsPage() {
   const [showDueColumn, setShowDueColumn] = useState(false);
   const [showMissingColumn, setShowMissingColumn] = useState(true);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [sortBy, setSortBy] = useState<'default' | 'missing_desc' | 'missing_asc' | 'out_desc' | 'out_asc'>('default');
+  const [outgoingMap, setOutgoingMap] = useState<Map<string, number>>(new Map());
 
   const [viewClient, setViewClient] = useState<any>(null);
   const [viewTab, setViewTab] = useState<'invoices' | 'payments' | 'caisses'>('invoices');
@@ -38,6 +40,7 @@ export default function ClientsPage() {
   const [missingMap, setMissingMap] = useState<Map<string, number>>(new Map());
 
   const canEdit = user?.role === 'boss' || user?.role === 'manager';
+  const canAddClient = user?.role === 'boss' || user?.role === 'manager' || user?.role === 'collector';
 
   const load = async () => {
     const [list, dups, missing] = await Promise.all([
@@ -47,9 +50,16 @@ export default function ClientsPage() {
     ]);
     setClients(list);
     setDupCount(dups.length);
-    const map = new Map<string, number>();
-    missing.forEach((m: any) => { if (m.client_id) map.set(m.client_id, m.balance || 0); });
-    setMissingMap(map);
+    const missMap = new Map<string, number>();
+    const outMap = new Map<string, number>();
+    missing.forEach((m: any) => {
+      if (m.client_id) {
+        missMap.set(m.client_id, m.balance || 0);
+        outMap.set(m.client_id, m.total_out || 0);
+      }
+    });
+    setMissingMap(missMap);
+    setOutgoingMap(outMap);
   };
   useEffect(() => { load(); }, []);
 
@@ -223,8 +233,19 @@ export default function ClientsPage() {
     if (filterMissingMax !== '') result = result.filter(c => (missingMap.get(c.id) || 0) <= Number(filterMissingMax));
     if (filterDueMin !== '') result = result.filter(c => (c.total_due || 0) >= Number(filterDueMin));
     if (filterDueMax !== '') result = result.filter(c => (c.total_due || 0) <= Number(filterDueMax));
+
+    if (sortBy === 'missing_desc') {
+      result = [...result].sort((a, b) => (missingMap.get(b.id) || 0) - (missingMap.get(a.id) || 0));
+    } else if (sortBy === 'missing_asc') {
+      result = [...result].sort((a, b) => (missingMap.get(a.id) || 0) - (missingMap.get(b.id) || 0));
+    } else if (sortBy === 'out_desc') {
+      result = [...result].sort((a, b) => (outgoingMap.get(b.id) || 0) - (outgoingMap.get(a.id) || 0));
+    } else if (sortBy === 'out_asc') {
+      result = [...result].sort((a, b) => (outgoingMap.get(a.id) || 0) - (outgoingMap.get(b.id) || 0));
+    }
+
     return result;
-  }, [clients, searchQuery, filterDateFrom, filterDateTo, filterCaissesMin, filterCaissesMax, filterMissingMin, filterMissingMax, filterDueMin, filterDueMax, missingMap]);
+  }, [clients, searchQuery, filterDateFrom, filterDateTo, filterCaissesMin, filterCaissesMax, filterMissingMin, filterMissingMax, filterDueMin, filterDueMax, missingMap, outgoingMap, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / rowsPerPage));
   const paginatedClients = filteredClients.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -239,9 +260,10 @@ export default function ClientsPage() {
     setFilterMissingMax('');
     setFilterDueMin('');
     setFilterDueMax('');
+    setSortBy('default');
     setCurrentPage(1);
   };
-  const hasActiveFilters = searchQuery || filterDateFrom || filterDateTo || filterCaissesMin || filterCaissesMax || filterMissingMin || filterMissingMax || filterDueMin || filterDueMax;
+  const hasActiveFilters = searchQuery || filterDateFrom || filterDateTo || filterCaissesMin || filterCaissesMax || filterMissingMin || filterMissingMax || filterDueMin || filterDueMax || sortBy !== 'default';
 
   return (
     <div>
@@ -253,7 +275,7 @@ export default function ClientsPage() {
               <i className="bi bi-shuffle me-1" />{t('Merge Duplicates')} ({dupCount})
             </button>
           )}
-          {canEdit && <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Add Client')}</button>}
+          {canAddClient && <button className="btn btn-primary" onClick={openCreate}><i className="bi bi-plus-lg me-1" />{t('Add Client')}</button>}
         </div>
       </div>
 
@@ -315,6 +337,14 @@ export default function ClientsPage() {
               <i className={`bi bi-eye${showMissingColumn ? '' : '-slash'} me-1`} />
               Missing
             </button>
+            <select className="form-select form-select-sm" style={{ width: 180 }} value={sortBy}
+              onChange={e => { setSortBy(e.target.value as any); setCurrentPage(1); }}>
+              <option value="default">Sort: Default</option>
+              <option value="missing_desc">Sort: Missing (High to Low)</option>
+              <option value="missing_asc">Sort: Missing (Low to High)</option>
+              <option value="out_desc">Sort: Outgoing (High to Low)</option>
+              <option value="out_asc">Sort: Outgoing (Low to High)</option>
+            </select>
             <span className="text-muted ms-auto small">
               Showing {paginatedClients.length} of {filteredClients.length} clients
             </span>

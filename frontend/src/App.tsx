@@ -12,6 +12,19 @@ import StockPage from './pages/StockPage';
 import AlertsPage from './pages/AlertsPage';
 import WholesaleInvoiceTracker from './pages/WholesaleInvoiceTracker';
 import CrateMovementTracker from './pages/CrateMovementTracker';
+import BossDailyArrivals from './pages/BossDailyArrivals';
+import BossStock from './pages/BossStock';
+import { useAuth } from './hooks/useAuth';
+
+function ArrivalsRoute() {
+  const { user } = useAuth();
+  return user?.role === 'boss' ? <BossDailyArrivals /> : <DailyArrivals />;
+}
+
+function StockRoute() {
+  const { user } = useAuth();
+  return user?.role === 'boss' ? <BossStock /> : <StockPage />;
+}
 
 export default function App() {
   return (
@@ -26,8 +39,8 @@ export default function App() {
               <Route path="caisse" element={<CaissePage />} />
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="users" element={<ProtectedRoute roles={['boss', 'manager']}><UsersPage /></ProtectedRoute>} />
-              <Route path="arrivals" element={<DailyArrivals />} />
-              <Route path="stock" element={<ProtectedRoute roles={['boss', 'manager', 'warehouse']}><StockPage /></ProtectedRoute>} />
+              <Route path="arrivals" element={<ArrivalsRoute />} />
+              <Route path="stock" element={<ProtectedRoute roles={['boss', 'manager', 'warehouse']}><StockRoute /></ProtectedRoute>} />
               <Route path="invoice-tracker" element={<WholesaleInvoiceTracker />} />
               <Route path="crate-tracker" element={<CrateMovementTracker />} />
             </Route>

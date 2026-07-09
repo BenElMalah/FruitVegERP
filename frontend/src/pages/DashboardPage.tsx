@@ -105,15 +105,6 @@ export default function DashboardPage() {
             <div className="col-6 col-md-3">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body text-center">
-                  <i className="bi bi-person-badge fs-3 text-info d-block mb-1" />
-                  <h3 className="mb-0">{memberCount}</h3>
-                  <small className="text-muted">Members</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-6 col-md-3">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body text-center">
                   <i className="bi bi-truck fs-3 text-success d-block mb-1" />
                   <h3 className="mb-0">{truckCount}</h3>
                   <small className="text-muted">Today's Trucks</small>

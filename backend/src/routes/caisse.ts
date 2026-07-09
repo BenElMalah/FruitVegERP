@@ -170,7 +170,7 @@ router.get('/balance/:clientId', async (req: AuthRequest, res: Response) => {
   res.json(result);
 });
 
-router.get('/missing', authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
+router.get('/missing', async (req: AuthRequest, res: Response) => {
   const { data: clients } = await supabaseAdmin.from('clients').select('id, name');
 
   const missing: any[] = [];
