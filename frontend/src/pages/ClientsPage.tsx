@@ -32,7 +32,7 @@ export default function ClientsPage() {
   const [outgoingMap, setOutgoingMap] = useState<Map<string, number>>(new Map());
 
   const [viewClient, setViewClient] = useState<any>(null);
-  const [viewTab, setViewTab] = useState<'invoices' | 'payments' | 'caisses'>('invoices');
+  const [viewTab, setViewTab] = useState<'invoices' | 'caisses'>('invoices');
   const [viewInvoices, setViewInvoices] = useState<any[]>([]);
   const [viewPayments, setViewPayments] = useState<any[]>([]);
   const [viewCaisse, setViewCaisse] = useState<any[]>([]);
@@ -584,35 +584,6 @@ export default function ClientsPage() {
                         </tr>
                       ))}
                       {!viewInvoices.length && <tr><td colSpan={7} className="text-center text-muted">{t('No invoices')}</td></tr>}
-                    </tbody>
-                  </table>
-                  </div>
-                )}
-
-                {!viewLoading && viewTab === 'payments' && (
-                  <div className="table-responsive">
-                  <table className="table table-sm table-hover">
-                        <thead><tr><th>{t('Invoice')}</th><th>{t('Amount')}</th><th>{t('Method')}</th><th>{t('Date')}</th><th>{t('Notes')}</th></tr></thead>
-                    <tbody>
-                      {viewPayments.map(p => {
-                        const inv = viewInvoices.find((i: any) => i.id === p.invoice_id);
-                        const isPaid = inv && (inv.remaining_amount || 0) <= 0;
-                        return (
-                          <tr key={p.id}>
-                            <td><small>{inv?.invoice_number || '-'}</small></td>
-                            <td className="text-success fw-semibold">
-                              {p.amount?.toFixed(2)}
-                              {isPaid && inv?.due_date && (
-                                <span className="text-muted ms-1 small">({new Date(inv.due_date).toLocaleDateString()})</span>
-                              )}
-                            </td>
-                            <td>{(p.payment_method || '').replace('_', ' ')}</td>
-                            <td><small>{(p as any).lcn_date || new Date(p.created_at).toLocaleDateString()}</small></td>
-                            <td><small className="text-muted">{p.notes || '-'}</small></td>
-                          </tr>
-                        );
-                      })}
-                      {!viewPayments.length && <tr><td colSpan={5} className="text-center text-muted">{t('No payments')}</td></tr>}
                     </tbody>
                   </table>
                   </div>

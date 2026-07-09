@@ -58,7 +58,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       const notifications = managers.map((m: any) => ({
         user_id: m.id,
         title: 'New Client Added',
-        message: `${req.user!.name} added a new client: ${name}`,
+        message: `${req.user!.email} added a new client: ${name}`,
         type: 'info',
         reference_type: 'client',
         reference_id: data.id,
