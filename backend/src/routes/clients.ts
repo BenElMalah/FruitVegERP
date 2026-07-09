@@ -96,13 +96,22 @@ router.put('/:id', authorize('boss', 'manager'), async (req: AuthRequest, res: R
 router.delete('/:id', authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
   const clientId = req.params.id;
 
-  // Delete related records first
-  await supabaseAdmin.from('caisse_movements').delete().eq('client_id', clientId);
-  await supabaseAdmin.from('invoice_items').delete().in('invoice_id',
-    (await supabaseAdmin.from('invoices').select('id').eq('client_id', clientId)).data?.map((i: any) => i.id) || []
-  );
-  await supabaseAdmin.from('payments').delete().eq('client_id', clientId);
-  await supabaseAdmin.from('invoices').delete().eq('client_id', clientId);
+  // Check for related data
+  const [caisseResult, invoiceResult, paymentResult] = await Promise.all([
+    supabaseAdmin.from('caisse_movements').select('id', { count: 'exact', head: true }).eq('client_id', clientId),
+    supabaseAdmin.from('invoices').select('id', { count: 'exact', head: true }).eq('client_id', clientId),
+    supabaseAdmin.from('payments').select('id', { count: 'exact', head: true }).eq('client_id', clientId),
+  ]);
+
+  const caisseCount = caisseResult.count || 0;
+  const invoiceCount = invoiceResult.count || 0;
+  const paymentCount = paymentResult.count || 0;
+
+  if (caisseCount > 0 || invoiceCount > 0 || paymentCount > 0) {
+    return res.status(400).json({
+      error: `Cannot delete client with existing data: ${caisseCount} caisse movements, ${invoiceCount} invoices, ${paymentCount} payments. Delete related data first.`,
+    });
+  }
 
   const { error } = await supabaseAdmin
     .from('clients')
