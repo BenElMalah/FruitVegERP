@@ -405,6 +405,7 @@ export default function ClientsPage() {
                 <th>{t('Name')}</th>
                 <th>{t('Phone')}</th>
                 <th>{t('Address')}</th>
+                <th className="text-end">{t('Out')}</th>
                 <th className="text-end">{t('Missing')}</th>
                 {showDueColumn && <th className="text-end">{t('Due')}</th>}
                 <th style={{ width: 100 }}>{t('Actions')}</th>
@@ -417,6 +418,16 @@ export default function ClientsPage() {
                   <td><button className="btn btn-link p-0 text-primary fw-semibold text-decoration-none" onClick={() => openViewClient(c)}>{c.name}</button></td>
                   <td>{c.phone || <span className="text-muted">-</span>}</td>
                   <td><small>{c.address || '-'}</small></td>
+                  <td className="text-end">
+                    {(() => {
+                      const out = outgoingMap.get(c.id) || 0;
+                      return out > 0 ? (
+                        <span className="badge bg-warning bg-opacity-25 text-warning-emphasis">{out}</span>
+                      ) : (
+                        <span className="text-muted">0</span>
+                      );
+                    })()}
+                  </td>
                   {showMissingColumn && (
                     <td className="text-end">
                       {(() => {
@@ -462,7 +473,7 @@ export default function ClientsPage() {
               ))}
               {!paginatedClients.length && (
                 <tr>
-                  <td colSpan={showDueColumn ? 7 : 6} className="text-center text-muted py-5">
+                  <td colSpan={showDueColumn ? 8 : 7} className="text-center text-muted py-5">
                     <i className="bi bi-inbox display-6 d-block mb-2 opacity-50" />
                     No clients found
                   </td>

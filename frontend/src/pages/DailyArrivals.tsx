@@ -145,7 +145,7 @@ export default function DailyArrivals() {
     return Math.max(0, weight - tare);
   };
 
-  const createCaisseMovements = async (clientId: string, caisseDetails: { caisse_type_id: string; count: number }[]) => {
+  const createCaisseMovements = async (clientId: string, caisseDetails: { caisse_type_id: string; count: number }[], arrivalId?: string) => {
     for (const cd of caisseDetails) {
       if (!cd.caisse_type_id || cd.count <= 0) continue;
       try {
@@ -154,7 +154,7 @@ export default function DailyArrivals() {
           caisse_type_id: cd.caisse_type_id,
           quantity: cd.count,
           movement_type: 'out',
-          notes: `Arrival on ${date}`,
+          notes: arrivalId ? `arrival:${arrivalId}` : `Arrival on ${date}`,
         });
       } catch (e) {
         console.error('Failed to create caisse movement:', e);
@@ -229,7 +229,7 @@ export default function DailyArrivals() {
     const truck = trucks.find((t: any) => t.id === selectedTruckId);
     if (!truck) return;
     try {
-      await api.arrivals.create({
+      const newEntry = await api.arrivals.create({
         arrival_date: date,
         truck_id: selectedTruckId,
         client_id: clientId,
@@ -239,7 +239,7 @@ export default function DailyArrivals() {
         price: rowForm.price || truck.default_price,
         status: rowForm.status,
       });
-      await createCaisseMovements(clientId, rowForm.caisse_details);
+      await createCaisseMovements(clientId, rowForm.caisse_details, newEntry?.id);
       setShowRowModal(false);
       setEditingRow(null);
       resetRowForm();
@@ -252,6 +252,9 @@ export default function DailyArrivals() {
   const handleUpdateRow = async () => {
     if (!editingRow?.id) return;
     try {
+      // Delete old caisse movements for this specific arrival
+      await api.caisse.deleteMovementsByClient(editingRow.client_id, `arrival:${editingRow.id}`).catch(() => {});
+      // Update the entry
       await api.arrivals.update(editingRow.id, {
         client_id: rowForm.client_id,
         caisse_details: rowForm.caisse_details,
@@ -259,6 +262,8 @@ export default function DailyArrivals() {
         price: rowForm.price,
         status: rowForm.status,
       });
+      // Create new caisse movements
+      await createCaisseMovements(rowForm.client_id, rowForm.caisse_details, editingRow.id);
       setShowRowModal(false);
       setEditingRow(null);
       resetRowForm();
@@ -271,6 +276,11 @@ export default function DailyArrivals() {
   const handleDeleteRow = async (id: string) => {
     if (!confirm('Delete this entry?')) return;
     try {
+      // Find the entry to get client_id for caisse movement cleanup
+      const entry = arrivals.find((a: any) => a.id === id);
+      if (entry?.client_id) {
+        await api.caisse.deleteMovementsByClient(entry.client_id, `arrival:${id}`).catch(() => {});
+      }
       await api.arrivals.delete(id);
       load();
     } catch (e: any) {

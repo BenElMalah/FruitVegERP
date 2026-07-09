@@ -108,6 +108,10 @@ export const api = {
       request<any>('/caisse/movements', { method: 'POST', body: JSON.stringify(data) }),
     updateMovement: (id: string, data: any) =>
       request<any>(`/caisse/movements/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteMovement: (id: string) =>
+      request<void>(`/caisse/movements/${id}`, { method: 'DELETE' }),
+    deleteMovementsByClient: (client_id: string, notes_like?: string) =>
+      request<void>('/caisse/movements-by-client', { method: 'DELETE', body: JSON.stringify({ client_id, notes_like }) }),
     balance: (clientId: string) => request<any[]>(`/caisse/balance/${clientId}`),
     missing: () => request<any[]>('/caisse/missing'),
   },

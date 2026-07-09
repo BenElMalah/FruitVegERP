@@ -129,6 +129,29 @@ router.put('/movements/:id', authorize('boss', 'manager'), async (req: AuthReque
   res.json(data);
 });
 
+router.delete('/movements/:id', authorize('boss', 'manager', 'warehouse'), async (req: AuthRequest, res: Response) => {
+  const { error } = await supabaseAdmin
+    .from('caisse_movements')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(204).send();
+});
+
+router.delete('/movements-by-client', authorize('boss', 'manager', 'warehouse'), async (req: AuthRequest, res: Response) => {
+  const { client_id, notes_like } = req.body;
+
+  if (!client_id) return res.status(400).json({ error: 'client_id required' });
+
+  let query = supabaseAdmin.from('caisse_movements').delete().eq('client_id', client_id);
+  if (notes_like) query = query.like('notes', notes_like);
+
+  const { error } = await query;
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(204).send();
+});
+
 router.get('/balance/:clientId', async (req: AuthRequest, res: Response) => {
   const { data: movements, error } = await supabaseAdmin
     .from('caisse_movements')
