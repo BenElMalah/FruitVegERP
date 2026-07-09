@@ -449,7 +449,7 @@ export default function ClientsPage() {
                       <button className="btn btn-sm btn-outline-primary" onClick={() => openEdit(c)} disabled={!canEdit} title="Edit">
                         <i className="bi bi-pencil" />
                       </button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => remove(c.id)} disabled={user?.role !== 'boss'} title="Delete">
+                      <button className="btn btn-sm btn-outline-danger" onClick={() => remove(c.id)} disabled={!canEdit} title="Delete">
                         <i className="bi bi-trash" />
                       </button>
                     </div>

@@ -93,7 +93,7 @@ router.put('/:id', authorize('boss', 'manager'), async (req: AuthRequest, res: R
   res.json(data);
 });
 
-router.delete('/:id', authorize('boss'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
   const { error } = await supabaseAdmin
     .from('clients')
     .delete()
