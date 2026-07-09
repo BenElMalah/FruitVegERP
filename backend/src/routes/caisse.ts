@@ -176,16 +176,37 @@ router.get('/missing', async (req: AuthRequest, res: Response) => {
   const missing: any[] = [];
 
   for (const client of clients || []) {
-    const { data: balance } = await supabaseAdmin
-      .rpc('get_client_caisse_balance', { p_client_id: client.id });
+    const { data: movements } = await supabaseAdmin
+      .from('caisse_movements')
+      .select('caisse_type_id, quantity, movement_type, id, created_at')
+      .eq('client_id', client.id);
 
-    if (balance && balance.length > 0) {
-      const totalOut = balance.reduce((sum: number, b: any) => sum + (b.total_out || 0), 0);
-      const totalReturned = balance.reduce((sum: number, b: any) => sum + (b.total_returned || 0), 0);
-      missing.push({ client_id: client.id, client: client.name, total_out: totalOut, total_returned: totalReturned, balance: totalOut - totalReturned });
-    } else {
-      missing.push({ client_id: client.id, client: client.name, total_out: 0, total_returned: 0, balance: 0 });
-    }
+    // Find first return per client to exclude
+    const returns = (movements || [])
+      .filter((m: any) => m.movement_type === 'return')
+      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const firstReturnId = returns.length > 0 ? returns[0].id : null;
+
+    let totalOut = 0;
+    let totalReturned = 0;
+
+    (movements || []).forEach((m: any) => {
+      if (m.movement_type === 'out') {
+        totalOut += m.quantity;
+      } else if (m.movement_type === 'return') {
+        if (m.id !== firstReturnId) {
+          totalReturned += m.quantity;
+        }
+      }
+    });
+
+    missing.push({
+      client_id: client.id,
+      client: client.name,
+      total_out: totalOut,
+      total_returned: totalReturned,
+      balance: totalOut - totalReturned,
+    });
   }
 
   res.json(missing);
