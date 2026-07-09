@@ -94,10 +94,20 @@ router.put('/:id', authorize('boss', 'manager'), async (req: AuthRequest, res: R
 });
 
 router.delete('/:id', authorize('boss', 'manager'), async (req: AuthRequest, res: Response) => {
+  const clientId = req.params.id;
+
+  // Delete related records first
+  await supabaseAdmin.from('caisse_movements').delete().eq('client_id', clientId);
+  await supabaseAdmin.from('invoice_items').delete().in('invoice_id',
+    (await supabaseAdmin.from('invoices').select('id').eq('client_id', clientId)).data?.map((i: any) => i.id) || []
+  );
+  await supabaseAdmin.from('payments').delete().eq('client_id', clientId);
+  await supabaseAdmin.from('invoices').delete().eq('client_id', clientId);
+
   const { error } = await supabaseAdmin
     .from('clients')
     .delete()
-    .eq('id', req.params.id);
+    .eq('id', clientId);
 
   if (error) return res.status(400).json({ error: error.message });
   res.status(204).send();

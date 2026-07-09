@@ -80,8 +80,12 @@ export default function ClientsPage() {
 
   const remove = async (id: string) => {
     if (confirm(t('Delete this client?'))) {
-      await api.clients.delete(id);
-      load();
+      try {
+        await api.clients.delete(id);
+        load();
+      } catch (err: any) {
+        alert(err.message || 'Failed to delete client');
+      }
     }
   };
 
